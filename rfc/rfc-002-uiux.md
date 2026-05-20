@@ -42,9 +42,8 @@ Two categories of insight are regularly needed:
 4. **Tag-based organization as the primary filter primitive.** Entity coloring, graph filtering, and tabular filtering are all driven by a consistent tag system, user-customizable at runtime.
 5. **Full-text search in both views.** Across entity properties and relationship metadata.
 6. **Contextual help.** In-context tooltips and explanations prevent expert-only usability.
-7. **Iterative UX improvement via user sessions.** Structured feedback loops inform the backlog.
-8. **Specific subgraph view by clicking on one entity**: The design structure of graph view can be overwhelming for most end users as their AI assets would be scattered across a lot of resources that need to be unified. For mitigation, user can click one entity to open a new subgraph view.  
-9. **Table and graph view updated in real-time**: Assets in a company change all the time, the changes could be retrieved in near-real-time by polling mechanisms.
+7. **Specific subgraph view by clicking on one entity**: The design structure of graph view can be overwhelming for most end users as their AI assets would be scattered across a lot of resources that need to be unified. For mitigation, user can click one entity to open a new subgraph view.  
+8. **Table and graph view updated in real-time**: Assets in a company change all the time, the changes could be retrieved in near-real-time by polling mechanisms.
 
 ---
 
