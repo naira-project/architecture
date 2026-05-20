@@ -13,7 +13,7 @@ Author  | @kocakkaan                                   |
 
 ## Abstract
 
-This RFC defines the UI/UX architecture for the **Naira platform's asset visualization layer**. Naira aggregates AI assets scattered across a company's ecosystem such as models, datasets, agents, MCP servers, skills, and more into a unified, source-agnostic representation via the Core API design. This RFC proposes two complementary visualization modes to surface that data:
+This RFC defines the UI/UX architecture for the **Naira platform's asset visualization layer, specifically concentrating itself on the asset aggregation**. Naira aggregates AI assets scattered across a company's ecosystem such as models, datasets, agents, MCP servers, skills, and more into a unified, source-agnostic representation via the Core API design. This RFC proposes two complementary visualization modes to surface that data:
 
 1. **Graph View**: an interactive, filterable topology map for discovering lineage and relationships between AI assets across clusters and environments.
 2. **Tabular View**: a detail-rich, filterable data grid for deep inspection of a specific asset class.
