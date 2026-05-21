@@ -13,12 +13,13 @@ Author  | @kocakkaan                                   |
 
 ## Abstract
 
-This RFC defines the UI/UX architecture for the **Naira platform's asset visualization layer, specifically concentrating itself on the asset aggregation**. Naira aggregates AI assets scattered across a company's ecosystem such as models, datasets, agents, MCP servers, skills, and more into a unified, source-agnostic representation via the Core API design. This RFC proposes two complementary visualization modes to surface that data:
+This RFC defines the UI/UX architecture for the **Naira platform's asset visualization layer, specifically concentrating itself on the asset aggregation**. Naira aggregates AI assets scattered across a company's ecosystem such as models, datasets, agents, MCP servers, skills, and more into a unified, source-agnostic representation via the Core API design. This RFC proposes three complementary visualization modes to surface that data:
 
 1. **Graph View**: an interactive, filterable topology map for discovering lineage and relationships between AI assets across clusters and environments.
 2. **Tabular View**: a detail-rich, filterable data grid for deep inspection of a specific asset class.
+3. **Merged View**: a merged view which wraps around a tabular view that concentrates upon both relationships across different entities as well as details of each entity.
 
-Both views are grounded in OpenMFP (Open Managed Frontend Platform), which provides the extensible UI shell, module federation, navigation, and runtime context into which both views are embedded as pluggable micro-frontends. The role-based, tag-filtered, and search-enabled design must remain consistent across both modes.
+All views are grounded in OpenMFP (Open Micro Frontend Platform), which provides the extensible UI shell, module federation, navigation, and runtime context into which all views are embedded as pluggable micro-frontends. Property-filtered and and search-enabled design must remain consistent across both modes.
 
 ---
 
@@ -26,20 +27,22 @@ Both views are grounded in OpenMFP (Open Managed Frontend Platform), which provi
 
 Naira's Core API design produces a source-agnostic, normalized representation of AI assets regardless of origin scanner or framework. This is necessary but not sufficient: engineers, security teams, and platform operators need intuitive, purpose-built interfaces to make sense of what can be hundreds or thousands of interrelated AI components distributed across projects, clusters, and deployment environments.
 
-Two categories of insight are regularly needed:
+Three categories of insight are regularly needed:
 
 **Relational / lineage insight.** Questions like "which downstream agents depend on this model?" or "what MCP servers does this agent fleet expose?" are fundamentally graph questions. A tabular list cannot convey topology.
 
 **Detail insight.** Questions like "show me all models in production that are not pinned to a fixed version" or "what are the declared permissions of every MCP server registered this month?" are filtering and aggregation questions. A graph cannot convey tabular density.
 
+**Alternative merged insight.** User may feel overwhelmed by filtering different views back and forth just to reach out to some relationships or get some details. This is why relationships in a graph view can also be provided via property-based filtering in a tabular view as an alternative.
+
 ---
 
 ## Goals
 
-1. **Two-mode visualization.** Deliver a Graph View and a Tabular View as distinct, complementary interfaces within the same platform shell.
+1. **Three-mode visualization.** Deliver a Graph View, Tabular View, and a Merged View as distinct, complementary interfaces within the same platform shell.
 2. **OpenMFP-native embedding.** Both views are implemented as OpenMFP micro-frontend modules, conforming to its module federation contract and consuming the OpenMFP navigation and context APIs.
-3. **Role-differentiated defaults.** App Developers, AI Engineers, and Platform Engineers see pre-filtered, role-appropriate views by default while retaining the ability to explore beyond those defaults.
-4. **Tag-based organization as the primary filter primitive.** Entity coloring, graph filtering, and tabular filtering are all driven by a consistent tag system, user-customizable at runtime.
+3. **Rich dashboard ecosystem with transparent switching between different dashboard structures.** Users can pick up provided dashboards or they can customize their own dashboard based on existing templates (such as "list of models", "list of agents"...). Users will also have the ability to switch between dashboards flexibly, they won't stick to one rigid dashboard. 
+4. **Property-based organization as the primary filter primitive.** Entity coloring, graph filtering, and tabular filtering are all driven by a consistent property system, user-customizable at runtime.
 5. **Full-text search in both views.** Across entity properties and relationship metadata.
 6. **Contextual help.** In-context tooltips and explanations prevent expert-only usability.
 7. **Specific subgraph view by clicking on one entity**: The design structure of graph view can be overwhelming for most end users as their AI assets would be scattered across a lot of resources that need to be unified. For mitigation, user can click one entity to open a new subgraph view.  
@@ -62,7 +65,8 @@ Two categories of insight are regularly needed:
 |------|------------|
 | **Asset** | Any AI component tracked by Naira (model, dataset, agent, MCP server, skill, etc.) represented by the Core API schema. |
 | **Relationship** | A directed or undirected edge between two Assets (e.g. `uses`, `trained-on`, `exposes`, `depends-on`). |
-| **Tag** | A key-value label attached to an Asset or Relationship, sourced from the upstream scanner or applied manually within Naira. |
+| **Property** | A key-value label attached to an Asset or Relationship, sourced from the upstream scanner or applied manually within Naira. |
+| **Tag** | A plain string label attached to an Asset or Relationship |
 | **Subject** | A tracked entity (agent, fleet, project, deployment) |
 | **OpenMFP** | The extensible UI shell that hosts Naira's micro-frontend modules. |
 | **Graph View** | The topology-oriented visualization mode. |
@@ -73,7 +77,7 @@ Two categories of insight are regularly needed:
 
 ### OpenMFP Integration
 
-Naira's frontend is not a standalone application; it is a set of **OpenMFP micro-frontend modules** mounted into the shared platform shell. Each view (Graph, Tabular) is compiled as a separately deployable micro-frontend exposing a well-defined OpenMFP module manifest (`naira/graph`, `naira/tabular`). The shell loads these at runtime without a full redeployment cycle.
+Naira's frontend is not a standalone application; it is a set of **OpenMFP micro-frontend modules** mounted into the shared platform shell. Each view (Graph, Tabular) is compiled as a separately deployable micro-frontend exposing a well-defined OpenMFP module manifest (`naira/graph`, `naira/tabular`, `naira/merged`). The shell loads these at runtime without a full redeployment cycle.
 
 ---
 
@@ -85,15 +89,7 @@ The Graph View enables **relational discovery and lineage exploration** across a
 
 #### Entry point and role-based defaults
 
-Each role arrives at a pre-filtered graph tailored to their primary concerns:
-
-| Role | Default visible asset types | Default hidden |
-|------|-----------------------------|----------------|
-| AI Engineer | Models, Datasets, Skills, Guardrails | Application-layer assets (APIs, frontends) |
-| App Developer | Agents, MCP Servers, APIs, Agent-facing Skills | Low-level ML assets (raw datasets, adapters) |
-| Platform Engineer | Full fleet: all asset types and all relationships | Nothing hidden; cross-cluster edges visible |
-
-These defaults are persisted per user in the OpenMFP preferences store and overridable at runtime.
+Each user will have the right to pick or customize their dashboard based on AI assets avaiable in Naira. This will provide dynamic graphs that will be pre-filtered tailored to each user's primary concerns.
 
 #### Node representation
 
@@ -163,10 +159,10 @@ KPI tiles react to the active filter and search state; they always reflect the v
 
 #### Filtering and search
 
-- **Tag filter chip bar** above the grid: identical tag filtering primitive as the Graph View, ensuring consistent UX vocabulary. Active filters are rendered as removable chips.
-- **Column-level filters**: type-aware filter controls per column (text contains, equals, date range, enum multi-select). Column filters compound with the tag filter.
+- **Property filter chip bar** above the grid: identical property filtering primitive as the Graph View, ensuring consistent UX vocabulary. Active filters are rendered as removable chips.
+- **Column-level filters**: type-aware filter controls per column (text contains, equals, date range, enum multi-select). Column filters compound with the property filter.
 - **Full-text search bar**: searches the same indexed property set as the Graph View. Results highlight matching cells within the grid.
-- **Saved filter presets**: users can save a named combination of tag filters, column filters, and search terms as a preset, accessible via a dropdown.
+- **Saved filter presets**: users can save a named combination of property filters, column filters, and search terms as a preset, accessible via a dropdown.
 
 #### Contextual help
 
@@ -181,21 +177,21 @@ Complex status columns (e.g. "Finding severity", "Schema drift") include a legen
 
 ### Navigation between views
 
-The Graph View and Tabular View are complementary. Navigation between them is seamless:
+The Graph View, Tabular View and Merged View are complementary. Navigation between them is seamless:
 
 - The node detail panel in the Graph View includes a **"View all [asset type]"** link that opens the corresponding Tabular View pre-filtered to the same asset class.
-- Any row in the Tabular View includes a **"Show in graph"** action that opens the Graph View centered on that asset's subgraph.
-
+- Any row in the Tabular View includes a **"Show in graph"** or **Show in Merged View** action that opens the Graph View centered on that asset's subgraph.
+- User will have the possibility deviating from Merged View with the **Show in graph** or **Show this asset in Tabular View** actions.
 ---
 
 
 ## Rationale and Alternatives
 
-**Why two distinct views rather than a unified view?**
-Graph and tabular representations optimize for fundamentally different cognitive tasks. A graph excels at topology and lineage; a table excels at enumeration and filtering. The navigation bridge between the two views provides the integration without compromising either.
+**Why three distinct views rather than a unified view or two views?**
+Graph and tabular representations optimize for fundamentally different cognitive tasks. A graph excels at topology and lineage; a table excels at enumeration and filtering. The navigation bridge between the two views provides the integration without compromising either. A merged view is added for understanding if a unified view of relationships and details would be sufficient. If yes, then one/some of the unused views could be discarded and their features would be embedded into remaining views.
 
-**Why tag-based filtering as the primary organizing primitive?**
-Tags are the lowest-common-denominator organizational unit across all asset sources (scanner output, manual annotation, CI metadata). A tag-first filtering model works regardless of whether the operator uses project-based, team-based, environment-based, or risk-level-based organization schemes. Fixed category hierarchies would impose a single organizational model the platform cannot enforce.
+**Why property-based filtering as the primary organizing primitive?**
+Properties are the lowest-common-denominator organizational unit across all asset sources (scanner output, manual annotation, CI metadata). A property-first filtering model works regardless of whether the operator uses project-based, team-based, environment-based, or risk-level-based organization schemes. Fixed category hierarchies would impose a single organizational model the platform cannot enforce.
 
 **Why force-directed layout as the default?**
 Force-directed layouts reveal clustering and centrality without requiring the operator to know the graph structure in advance. Alternative layouts (hierarchical, radial) are provided for users who already know what they are looking for and need a specific structural framing.
@@ -205,8 +201,7 @@ Force-directed layouts reveal clustering and centrality without requiring the op
 ## Drawbacks
 
 - **Graph performance at scale.** Force-directed layouts are computationally expensive for graphs with thousands of nodes. v1 mitigates this through server-side pre-computation of layout coordinates and a progressive rendering strategy (load visible viewport first). Very large fleets may require switching to a hierarchical or cluster-aggregated layout by default.
-- **Tag consistency is user-dependent.** The power of tag-based filtering depends on consistent tagging discipline. Untagged or inconsistently tagged assets reduce the utility of both the color coding and the filter panel. Mitigation: the Tabular View surfaces an "untagged assets" KPI tile to create visibility into the gap.
-- **Role defaults require ongoing calibration.** The pre-filtered views for each role are based on current assumptions about what each persona needs. These will need adjustment as real usage data is collected.
+- **Property consistency is user-dependent.** The power of property-based filtering depends on consistent key-value pairing discipline. Inconsistently paired assets reduce the utility of both the color coding and the filter panel. Mitigation: the Tabular View surfaces an "assets without properties" KPI tile to create visibility into the gap.
 
 ---
 
@@ -229,3 +224,4 @@ Force-directed layouts reveal clustering and centrality without requiring the op
 ## Changelog
 
 - 2026-05-20: Initial draft
+- 2026-05-21: First iteration based on feedback from @mkorbi and @akavel-reply
