@@ -65,19 +65,17 @@ Three categories of insight are regularly needed:
 |------|------------|
 | **Asset** | Any AI component tracked by Naira (model, dataset, agent, MCP server, skill, etc.) represented by the Core API schema. |
 | **Relationship** | A directed or undirected edge between two Assets (e.g. `uses`, `trained-on`, `exposes`, `depends-on`). |
-| **Property** | A key-value label attached to an Asset or Relationship, sourced from the upstream scanner or applied manually within Naira. |
+| **Property** | A key-value label attached to an Asset or Relationship, sourced from the upstream scanner. |
 | **Tag** | A plain string label attached to an Asset or Relationship |
-| **Subject** | A tracked entity (agent, fleet, project, deployment) |
 | **OpenMFP** | The extensible UI shell that hosts Naira's micro-frontend modules. |
 | **Graph View** | The topology-oriented visualization mode. |
 | **Tabular View** | The detail-oriented, filterable data-grid mode. |
-| **Role** | One of three platform persona: App Developer, AI Engineer, Platform Engineer. |
 
 ---
 
 ### OpenMFP Integration
 
-Naira's frontend is not a standalone application; it is a set of **OpenMFP micro-frontend modules** mounted into the shared platform shell. Each view (Graph, Tabular) is compiled as a separately deployable micro-frontend exposing a well-defined OpenMFP module manifest (`naira/graph`, `naira/tabular`, `naira/merged`). The shell loads these at runtime without a full redeployment cycle.
+Naira's frontend is not a standalone application; it is a set of **OpenMFP micro-frontend modules** mounted into the shared platform shell. Each view (Graph, Tabular) is compiled as a micro-frontend exposing a well-defined OpenMFP content configuration (`naira/graph`, `naira/tabular`, `naira/merged`). The shell loads these at runtime without a full redeployment cycle.
 
 ---
 
@@ -93,23 +91,23 @@ Each user will have the right to pick or customize their dashboard based on AI a
 
 #### Node representation
 
-- Each node represents a single Asset. The node renders a compact badge: asset-type icon, asset name, and a one-line summary of the most salient attribute (e.g. model version, MCP server URL, dataset size).
+- Each node represents a single Asset. The node renders a compact badge: asset-type icon, asset name, and a one-line summary of the most salient attribute (e.g. model version, MCP server URL, dataset size). The salient attribute must be determined by the plugin itself by default, later enabling customization for the user. User would be welcomed with a screen for each AI asset at the beginning, and can select which attribute they want to see right away for each AI asset that they have access to. 
 - **Node size** scales with the node's degree (number of inbound + outbound edges), giving a natural visual weight to high-centrality assets such as a foundational model used by many agents or a shared MCP server.
 - **Node color** is determined by the asset's primary tag category. The color-to-tag mapping is user-configurable in the filter panel. Color is applied consistently across the graph and the legend.
-- **Edge styling** encodes relationship type: `uses` edges are solid; `trained-on` edges are dashed; `exposes` edges use a distinct arrowhead. Edge thickness optionally encodes call frequency (where runtime data is available).
+
 
 #### Interaction model
 
 - **Click on node → entity-scoped subgraph.** Clicking any node replaces the current graph canvas with a subgraph showing only the clicked asset and its direct and second-degree relationships. A breadcrumb trail allows navigating back.
-- **Click on node → detail panel.** A side panel slides in alongside the subgraph showing the full Core API record for the asset such as all attributes represented as tags.
+- **Click on node → detail panel.** A side panel slides in alongside the subgraph showing the full Core API record for the asset such as all attributes represented as properties.
 - **Click on edge → relationship detail.** A tooltip or panel shows relationship type and source scanner.
 - **Zoom-based progressive disclosure.** At low zoom, only node name and type icon are visible. At medium zoom, one or two key attributes appear on-node. At high zoom, the full attribute badge is rendered in-place, reducing the need to click into the detail panel.
-- **Subgraph navigation.** Clicking a node in the subgraph context drills into that node's subgraph, maintaining back-navigation history.
+- **Subgraph navigation.** Clicking a node in the subgraph context drills into that node's subgraph, maintaining back-navigation history. Back-navigation history will be enabled through breadcrumbs, where clicking on a subgraph leads to the path shown as breadcrumb on top of the graph. By clicking on the previous path, user can go to the previous graph view.
 
 #### Filtering and search
 
-- **Tag filter panel** (left sidebar): multi-select tags; the graph instantly hides nodes not matching the active filter set.
-- **Asset type filter**: checkboxes for each tracked asset class; mirrors the role-based defaults but is fully user-adjustable.
+- **Tag filter panel** (left sidebar): multi-select tags; the graph hides nodes not matching the active filter set.
+- **Asset type filter**: checkboxes for each tracked asset class; they are fully user-adjustable. 
 - **Environment / cluster filter**: for multi-cluster deployments, nodes can be scoped to one or more registered environments.
 - **Full-text search bar**: searches across all indexed asset properties (name, description, version, URL, tags, provider). Matching nodes are highlighted; non-matching nodes are dimmed. Search is debounced; results arrive without a page reload.
 
@@ -153,16 +151,15 @@ KPI tiles react to the active filter and search state; they always reflect the v
 
 - Columns are determined by the Core API schema for the asset class. Columns are reorderable, resizable, and hideable per user preference.
 - Default sort is name of the asset in an alphabetical order.
-- Multi-column sort is supported.
-- Row click opens a detail drawer identical to the one used in the Graph View's node detail panel, maintaining a consistent information architecture across both views.
-- Row selection (multi-select) enables bulk actions such as bulk tag assignment.
+- Row click opens a detail drawer similar to the one used in the Graph View's node detail panel, maintaining a consistent information architecture across both views.
+- Row selection (multi-select) enables bulk actions such as separate detail pages.
 
 #### Filtering and search
 
 - **Property filter chip bar** above the grid: identical property filtering primitive as the Graph View, ensuring consistent UX vocabulary. Active filters are rendered as removable chips.
 - **Column-level filters**: type-aware filter controls per column (text contains, equals, date range, enum multi-select). Column filters compound with the property filter.
 - **Full-text search bar**: searches the same indexed property set as the Graph View. Results highlight matching cells within the grid.
-- **Saved filter presets**: users can save a named combination of property filters, column filters, and search terms as a preset, accessible via a dropdown.
+- **Saved filter presets**: users can save a named combination of property filters and search terms as a preset, accessible via a dropdown.
 
 #### Contextual help
 
@@ -171,7 +168,6 @@ Every column header provides an info icon (`ⓘ`). Hovering reveals:
 - Its source in the Core API schema (field path).
 - Where applicable, a link to the relevant scanner.
 
-Complex status columns (e.g. "Finding severity", "Schema drift") include a legend tooltip explaining the status values.
 
 ---
 
@@ -200,16 +196,17 @@ Force-directed layouts reveal clustering and centrality without requiring the op
 
 ## Drawbacks
 
-- **Graph performance at scale.** Force-directed layouts are computationally expensive for graphs with thousands of nodes. v1 mitigates this through server-side pre-computation of layout coordinates and a progressive rendering strategy (load visible viewport first). Very large fleets may require switching to a hierarchical or cluster-aggregated layout by default.
-- **Property consistency is user-dependent.** The power of property-based filtering depends on consistent key-value pairing discipline. Inconsistently paired assets reduce the utility of both the color coding and the filter panel. Mitigation: the Tabular View surfaces an "assets without properties" KPI tile to create visibility into the gap.
+- **Graph performance at scale.** Force-directed layouts are computationally expensive for graphs with thousands of nodes. v1 mitigates this through server-side pre-computation of layout coordinates and a progressive rendering strategy (load visible viewport first). Very large fleets may require switching to a hierarchical or cluster-aggregated layout by default. In this RFC, the mitigation for this would be customized dashboards by the user, where a user selects specific AI assets that they need for showing and making actions with. This provides limited assets for each user by default, providing performance gains for the graph view. However, this technique must be improved and combined with other methodologies.
+- **Property mechanism is user-dependent.** The power of property-based filtering depends on key-value pairing discipline. Assets without any properties reduce the utility of both the color coding and the filter panel. Mitigation: the Tabular View surfaces an "assets without properties" KPI tile to create visibility into the gap.
 
 ---
 
 ## Future Work (out of scope for this RFC)
 
-- **Provide GraphRAG for graph view**: By providing a relational core API design, Naira enables users to interact with the graph in a flexible way. By ingesting the graph structure to a LLM, user will have flexible search which they can ask to Naira. This can be embedded as an AI assistant with a natural-language query interface exposed within the OpenMFP shell context.
+- **Provide graph grounded LLM retrieval for graph view**: By providing a relational core API design, Naira enables users to interact with the graph in a flexible way. By ingesting the graph structure to a LLM, user will have flexible search which they can ask to Naira. This can be embedded as an AI assistant with a natural-language query interface exposed within the OpenMFP shell context.
 - **User feedback sessions.**: After having a mature platform, structured 30–60 minute moderated sessions with representative users from each role to identify friction points can be organized. Findings feed a UI backlog maintained in alignment with the TSC.
-
+- **Edge styling** is a possible extension to be used inside Naira Graph View. Since there will be a lot of relationship types, using different styles for each edge would be a lot overwhelming Instead we can concentrate on edge thickness where edges could be optionally encoded based on call frequency (where runtime data is available). However, this should not be on the main features.
+- **Multi-column sort** will be supported in the later stages based on how much possible value it would provide.
 ---
 
 ## References
@@ -225,3 +222,4 @@ Force-directed layouts reveal clustering and centrality without requiring the op
 
 - 2026-05-20: Initial draft
 - 2026-05-21: First iteration based on feedback from @mkorbi and @akavel-reply
+- 2026-05-27: Second iteration based on feedback from @libera13 and @Daviidg
