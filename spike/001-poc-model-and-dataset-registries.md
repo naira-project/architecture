@@ -4,7 +4,7 @@ contributors: "@libera13, @Daviidg, @kocakkaan"
 ---
 
 # **Overview**
-This SPIKE document summarizes the work carried out for the issue SPIKE: Research and PoC Model Registries. The primary goal of this SPIKE was to research available model registries suitable for Naira's first PoC. Additionally, other AI assets - such as datasets, agents, and skills - were explored. Based on this research, a PoC was implemented that mirrors Naira's capabilities with respect to AI asset unification.
+This SPIKE document summarizes the work carried out for the issue [SPIKE: Research and PoC Model Registries](https://github.com/naira-project/product/issues/11). The primary goal of this SPIKE was to research available model registries suitable for Naira's first PoC. Additionally, other AI assets - such as datasets, agents, and skills - were explored. Based on this research, a PoC was implemented that mirrors Naira's capabilities with respect to AI asset unification.
 
 # **Outcome**
 
