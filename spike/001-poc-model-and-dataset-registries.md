@@ -1,5 +1,4 @@
 ---
-status: in review
 creation date: 2026-06-01
 contributors: "@libera13, @Daviidg, @kocakkaan"
 ---
