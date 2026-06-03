@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-540 -410 960 870" width="960" height="870">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#d97706" />
+    </marker>
+  </defs>
+
+  <style>
+    text { font-family: sans-serif; font-size: 11px; fill: #333; }
+    ellipse { fill: #fef3c7; stroke: #d97706; stroke-width: 2; }
+    line { stroke: #d97706; stroke-width: 2; }
+  </style>
+
+  <!-- Connectors (arrows) -->
+  <!-- dataset1 → model -->
+  <line x1="134.5" y1="-35.25" x2="-383.5" y2="-188.72" marker-end="url(#arrowhead)" />
+  <!-- dataset2 → model -->
+  <line x1="227" y1="-162.25" x2="-383.5" y2="-188.72" marker-end="url(#arrowhead)" />
+  <!-- model → app -->
+  <line x1="-415.25" y1="-221.25" x2="-478.75" y2="-315.72" marker-end="url(#arrowhead)" />
+  <!-- unlabeled1 → dataset1 -->
+  <line x1="88" y1="196.22" x2="155.5" y2="-8.75" marker-end="url(#arrowhead)" />
+  <!-- unlabeled2 → unlabeled1 -->
+  <line x1="-11.5" y1="357.75" x2="88" y2="261.28" marker-end="url(#arrowhead)" />
+
+  <!-- Ellipse nodes -->
+  <ellipse cx="-415.25" cy="-188.72" rx="31.75" ry="32.53" />  <!-- model -->
+  <ellipse cx="169"     cy="-35.25"  rx="34.5"  ry="33"    />  <!-- dataset 1 -->
+  <ellipse cx="261.5"   cy="-162.25" rx="34.5"  ry="33"    />  <!-- dataset 2 -->
+  <ellipse cx="-478.75" cy="-348.25" rx="31.75" ry="32.53" />  <!-- app -->
+  <ellipse cx="88"      cy="228.75"  rx="31.75" ry="32.53" />  <!-- unlabeled 1 -->
+  <ellipse cx="-40"     cy="372.75"  rx="31.75" ry="32.53" />  <!-- unlabeled 2 -->
+
+  <!-- Text labels -->
+
+  <!-- Model label -->
+  <text x="-452" y="-130">
+    <tspan x="-452" dy="0" font-style="italic">Node:</tspan>
+    <tspan x="-452" dy="14">kind: "<tspan font-weight="bold">model</tspan>"</tspan>
+    <tspan x="-452" dy="14">path: "<tspan font-weight="bold">clusterA/deepseek1</tspan>"</tspan>
+    <tspan x="-452" dy="14">props: {</tspan>
+    <tspan x="-432" dy="14">"litellm": {</tspan>
+    <tspan x="-412" dy="14">"token_price": "$5"</tspan>
+    <tspan x="-432" dy="14">},</tspan>
+    <tspan x="-432" dy="14">"mlflow/clusterA": {</tspan>
+    <tspan x="-412" dy="14">"release": "2.34"</tspan>
+    <tspan x="-432" dy="14">}</tspan>
+    <tspan x="-452" dy="14">}</tspan>
+  </text>
+
+  <!-- Relation label (on dataset1→model arrow) -->
+  <text x="-158" y="-64">
+    <tspan x="-158" dy="0" font-style="italic">Relation:</tspan>
+    <tspan x="-158" dy="14">kind: "<tspan font-weight="bold">trained_from</tspan>"</tspan>
+    <tspan x="-158" dy="14">props: {</tspan>
+    <tspan x="-138" dy="14">"datahub": {</tspan>
+    <tspan x="-118" dy="14">"trainer":</tspan>
+    <tspan x="-108" dy="14">"user:teamN/ZhangZh"</tspan>
+    <tspan x="-138" dy="14">}</tspan>
+    <tspan x="-158" dy="14">}</tspan>
+  </text>
+
+  <!-- Dataset 1 label -->
+  <text x="177" y="24">
+    <tspan x="177" dy="0" font-style="italic">Node:</tspan>
+    <tspan x="177" dy="14">kind: "<tspan font-weight="bold">dataset</tspan>"</tspan>
+    <tspan x="177" dy="14">path: "…"</tspan>
+    <tspan x="177" dy="14">props: …</tspan>
+  </text>
+
+  <!-- Dataset 2 label -->
+  <text x="256" y="-103">
+    <tspan x="256" dy="0" font-style="italic">Node:</tspan>
+    <tspan x="256" dy="14">kind: "<tspan font-weight="bold">dataset</tspan>"</tspan>
+    <tspan x="256" dy="14">path: "…"</tspan>
+    <tspan x="256" dy="14">props: …</tspan>
+  </text>
+
+  <!-- App label -->
+  <text x="-420" y="-370">
+    <tspan x="-420" dy="0" font-style="italic">Node:</tspan>
+    <tspan x="-420" dy="14">kind: "app"</tspan>
+    <tspan x="-420" dy="14">…</tspan>
+  </text>
+</svg>
