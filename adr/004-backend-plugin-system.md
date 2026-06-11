@@ -36,6 +36,7 @@ We will implement HashiCorp go-plugin, because it balances the need for process 
 * **Good:** Battle-tested architecture (powers the ecosystem for Terraform and Vault).
 * **Good:** Plugins run as separate processes, meaning a plugin crash cannot take down the core Naira engine.
 * **Good:** Supports multiple languages through an open RPC/gRPC protocol, while allowing native Go plugins to access standard libraries easily.
+* **Good:** Plugins can be loaded dynamically. Catalog can watch a directory for new binaries and register them at runtime.
 * **Bad:** Slightly more complex than local packages due to IPC communication, lifecycle management, and error tracing between the main app and the plugin process.
 * **Bad:** It's not k8s native. Plugins with catalog will be in one pod, which doesn't allow for easy scaling, and doesn't allow for granular RBAC
 
@@ -51,6 +52,7 @@ We will implement HashiCorp go-plugin, because it balances the need for process 
 * **Good:** Highly secure, isolated, and sandboxed execution environment.
 * **Good:** Extremely low resource usage and fast startup times.
 * **Good:** Good polyglot support (plugins can be written in Rust, Go, TypeScript, etc.).
+* **Good:** Plugins install don't require catalog restart. Modules are loaded/unloaded dynamically into the runtime memory.
 * **Bad:** Introduces too much setup overhead and "magic" for an early-stage project.
 * **Bad:** Managing granular permissions (e.g., giving a specific WASM module network access) requires custom host-function logic that we would need to build.
 
@@ -59,6 +61,7 @@ We will implement HashiCorp go-plugin, because it balances the need for process 
 * **Good:** Complete deployment flexibility. Plugins can run as long-lived Kubernetes Pods, ephemeral K8s Jobs (to save resources during syncs), or even local ad-hoc bash scripts feeding data via `curl`.
 * **Good:** Infrastructure-friendly security. Platform engineers can enforce access control using standard Kubernetes RBAC and Network Policies.
 * **Good:** Fully language-agnostic and trivial to manage via GitOps pipelines.
+* **Good:** Plugins install don't require catalog restart. Plugins are independent services, core simply updates its internal routing table.
 * **Bad:** Demands a highly mature, strictly versioned Ingestion API from day one, including complex authentication and bulk/asynchronous Job APIs for large snapshots.
 
 ---
