@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by [ADR-005](005-switch-to-grpc-sidecars.md)
 date: 2026-06-09
 written-by: Emil Libera
 ---
