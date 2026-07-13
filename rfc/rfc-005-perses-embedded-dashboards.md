@@ -181,9 +181,7 @@ Shipping the following dashboards with v1, each as a `PersesDashboard`:
 
 1. **`inference-endpoint-health`**: QPS, latency p50/p95/p99, error rate, GPU utilization (if
    available). Embedded into the Inference Endpoint detail page.
-2. **`model-registry-overview`**: model count by stage, recently-promoted models, version churn.
-   Embedded into the Model Registry browser.
-3. **`ai-gateway-consumption`**: token consumption by route, request count by upstream
+2. **`ai-gateway-consumption`**: token consumption by route, request count by upstream
    provider, rate-limit hit counts. Embedded into the AI Gateway / LiteLLM plugin's view.
 
 Each dashboard references the same `default-prometheus` `PersesDatasource`. Operators override
@@ -283,6 +281,8 @@ standard.
   dashboard panel, navigate to the model's Naira detail page; click an endpoint, jump to its
   AI Gateway view. Requires Perses extension points that don't fully exist yet but are on the
   project's roadmap.
+
+- **OpenMFP-native Perses integration.** There is an ongoing conversation with the OpenMFP community about integrating Perses natively into their ecosystem. If that happens, Naira would only need to integrate Perses itself, rather than maintaining its own MFE on top of it.
 
 ## References
 
