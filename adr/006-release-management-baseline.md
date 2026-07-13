@@ -103,6 +103,3 @@ To evolve the release management beyond this baseline, we will focus on the foll
 ---
 
 ## Links
-
-* Relates to [ADR-004](004-backend-plugin-system.md)
-* Relates to [ADR-005](005-switch-to-grpc-sidecars.md)
