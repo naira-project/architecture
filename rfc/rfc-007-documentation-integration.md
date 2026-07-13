@@ -6,7 +6,7 @@
 | Title            | Documentation Integration in Naira          |
 | Author(s)        | @Daviidg                                    |
 | Target Milestone | M1 - Foundation                             |
-| Status           | Draft                                       |
+| Status           | accepted                                       |
 | Type             | Feature                                     |
 | Created          | 2026-07-09                                  |
 
@@ -210,7 +210,6 @@ The MVP experience is **docs-in-context on the entity page**, not a separate doc
 
 ### Source of truth
 
-- Naira's own docs live in its central docs repo (VitePress).
 - Resource docs live in their source repositories.
 - Docs already in external systems (Confluence, SharePoint) stay there and are deep-linked.
 - If static site support (Option C) is added later, object storage (S3/GCS) is needed for the generated HTML.
