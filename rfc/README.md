@@ -28,9 +28,10 @@ Each RFC should include:
 3. Add relevant diagrams to `assets/` directory
 4. Update this README with your RFC
 
-## Relationship to ADRs
+## Relationship to ADRs & DDRs
 
 - **ADRs** (Architecture Decision Records): Document decisions made
+- **DDRs** (Design Decision Records): Document decisions made
 - **RFCs**: Propose and design solutions before decisions are made
 
-RFCs typically precede ADRs. Once an RFC is accepted and implemented, the decision is captured in an ADR.
+RFCs typically precede ADRs & DDRs. Once an RFC is accepted and implemented, the decision is captured in an ADR or DDR.
