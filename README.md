@@ -47,10 +47,10 @@ architecture/
 - `rfc/` — Requests for Comments
 - `adr/` — Architecture Decision Records
 - `ddr/` — Design Decision Records
-2. Use the next available number and a short descriptive name, for example:
+2. Use the next available number and a short descriptive name in each directory, for example:
    - `RFC-001-<name>.md`
-   - `ADR-002-<name>.md`
-   - `DDR-003-<naame>.md`
+   - `ADR-001-<name>.md`
+   - `DDR-001-<naame>.md`
 2. Start from the corresponding `TEMPLATE.md`.
 3. Open a pull request for review.
 
