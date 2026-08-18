@@ -112,7 +112,7 @@ The new testbed should:
 
 ## Decision
 
-Naira will rebuild the shared testbed using AWS EKS and vCluster.
+Naira will rebuild the shared testbed using AWS EKS and vCluster. Local development with Kind will continue to be fully supported, particularly for contributors who do not have access to the shared AWS testbed. The remote testbed is intended to complement local development, not replace it.
 
 The architecture will have three layers:
 
