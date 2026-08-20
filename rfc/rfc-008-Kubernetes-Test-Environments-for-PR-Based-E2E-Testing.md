@@ -54,7 +54,7 @@ In the near term, environments run on a throwaway Kubernetes cluster created fre
 
 The target is a small, persistent, shared Kubernetes cluster that CI authenticates into, rather than building one from scratch every run. That removes the resource ceiling and lets container images stay cached between runs instead of being re-downloaded every time. Moving to a shared cluster does mean some of our plugins need small fixes first, because a few of them currently look at cluster-wide state instead of just their own namespace — see "What Still Needs Fixing" below.
 
-A further step — giving each PR not just its own namespace but its own miniature Kubernetes control plane — was considered for the future. It would close a couple of isolation gaps that namespaces alone can't, but it adds a new moving part we don't need yet. It's recorded as a later iteration, not part of this proposal.
+A further step — giving each PR not just its own namespace but its own miniature Kubernetes control plane, using a tool called **vCluster** — is the **planned next iteration**, once the shared-cluster migration above is running in CI. It would close a couple of isolation gaps that namespaces alone can't, at a modest extra cost per PR. It's a deliberate follow-on, not part of this proposal.
 
 ## What Still Needs Fixing
 
@@ -64,7 +64,7 @@ This is a real, known gap, not a hidden one. Two small, contained code changes c
 
 ## Decision
 
-Proceed with: one namespace per PR, the full platform deployed into it by default, running on a throwaway cluster today and migrating to a shared cluster once the two isolation fixes land. Treat sharing dependencies across PRs — see "Sharing the heavy dependencies across all PRs" below — as a fallback to build only if the full-deployment approach proves too slow in practice, not as the starting design.
+Proceed with: one namespace per PR, the full platform deployed into it by default, running on a throwaway cluster today and migrating to a shared cluster once the two isolation fixes land. Treat sharing dependencies across PRs — see "Sharing the heavy dependencies across all PRs" below — as a fallback to build only if the full-deployment approach proves too slow in practice, not as the starting design. Once the shared cluster is running in CI, giving each PR its own miniature control plane via vCluster (see "Where This Runs") is the next planned step, not a maybe.
 
 ## Environment Lifecycle
 
