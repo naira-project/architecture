@@ -46,6 +46,8 @@ Give each PR its own namespace, and deploy everything that PR's tests need into 
 
 Because every dependency starts empty and privately owned, there's no need to invent naming schemes to keep one PR's test data from colliding with another's, no cleanup jobs that might silently fail, and no waiting in line behind another PR for a shared resource. Deleting the namespace when the tests finish removes everything, with nothing left over to garbage-collect later.
 
+This deliberately reuses what already exists rather than building a parallel implementation. The Kubernetes definitions mirror the ones developers already run locally, and the step that seeds a starting dataset runs the same seed scripts developers already use on their own machines, unchanged — just packaged to run as a one-off Kubernetes job instead of from a local checkout. There's one definition of "what a working Naira deployment looks like," not two that can quietly drift apart.
+
 The tradeoff is time and machine cost: standing up a full copy of the platform for a single PR takes several minutes and a meaningful chunk of CPU and memory, dominated by one particularly heavy dependency. A lighter alternative — sharing the expensive pieces across PRs and just faking isolation with careful naming — was considered and is documented as a fallback below, under "Sharing the heavy dependencies across all PRs" in **Alternatives We Considered** — but it was not chosen as the starting point.
 
 ## Where This Runs
