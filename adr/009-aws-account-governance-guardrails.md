@@ -7,7 +7,7 @@ written-by: Hossein Salahi
 # ADR-009: AWS Account Governance & Guardrails
 
 ## Context
-[Nira testbed rebuild](https://liquid-naira.atlassian.net/wiki/x/GIDyBw) rebuilds the shared testbed on AWS EKS and vCluster, this ADR provides both rails and guardrails by setting AWS account ownership, permissions, and billing responsibility that must be agreed before implementation.
+[ADR-007: Rebuild the Naira Testbed on AWS EKS](007-testbed-aws-rebuild.md) rebuilds the shared testbed on AWS EKS and vCluster, this ADR provides both rails and guardrails by setting AWS account ownership, permissions, and billing responsibility that must be agreed before implementation.
 
 The constraint that shapes every decision below is that the account is handed to us by SAP. We do not create it, we do not choose whether it sits in an Organization, and we should not assume Organization management access. Several things that look like design decisions are therefore facts to discover at handover, and a governance model that assumes otherwise will describe controls it cannot actually enforce.
 
@@ -84,6 +84,8 @@ Trusted subjects are matched exactly. A wildcard subject would trust every ref i
 
 ### Terraform State
 An S3 bucket with versioning, encryption, public access blocked.
+
+S3-native locking is opt-in. The backend acquires a lock only when the backend block sets `use_lockfile = true`, which writes a `.tflock` object alongside the state. Left unset, the bucket configuration above provides no concurrency protection and two applies overwrite each other silently. No DynamoDB table is used.
 
 ### Verification
 The model was tested end to end against a sandbox account that reproduces the expected constraint, being itself a member account without organization management access. The test confirmed that Organization policy authoring is denied, that the billing metric is absent, and that cost visibility and cost-allocation-tag activation are separate permissions granted independently. 
