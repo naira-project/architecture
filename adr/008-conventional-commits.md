@@ -6,8 +6,6 @@ written-by: Marcel Frizler
 
 # Enforcing Conventional Commits
 
-This is an Architecture Decision Record for the Naira Platform. Fill in each section, set the status, and link related ADRs or Github issue tickets.
-
 ## Context
 
 Naira uses Release Please to automate versioning, release pull requests, and changelog generation. Release Please derives release intent from commit messages on the target branch, particularly from Conventional Commit types such as `feat`, `fix`, and breaking-change markers.
