@@ -5,8 +5,7 @@
 | RFC              | 009                                            |
 | Title            | One Deployment Path for Naira                  |
 | Author(s)        | @hosseinsalahi                                 |
-| Target Milestone | (unassigned)                                   |
-| Status           | Draft                                          |
+| Status           | Proposed                                       |
 | Type             | Feature                                        |
 | Created          | 2026-09-11                                     |
 | Updated          | 2026-09-17                                     |
