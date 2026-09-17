@@ -15,7 +15,7 @@
 
 Naira has four ways to deploy itself and no single one an end user can consume. This RFC proposes:
 
-- Two versioned Helm charts: `naira` (first-party components) and `naira-dependencies` (the third-party tier, in `test-dependencies`).
+- Two versioned Helm charts: `naira` (first-party components) and `test-dependencies`.
 - Each published twice per release: as an OCI Helm chart that ArgoCD consumes, and inside an OCM component version carrying image digests, for signing and registry relocation.
 - ArgoCD deploys both from `test-dependencies`, pinned to chart versions.
 - Tilt renders the same charts for the inner development loop.
@@ -103,9 +103,9 @@ Per pull request:
 - Helm chart sanity checks.
 - A script that checks whether code or Dockerfile changes are reflected in the chart, e.g. a new plugin missing from the chart's plugin list. Human review alone misses these.
 - Deployment verified on a Kubernetes cluster.
-- Compatibility check between the `naira` chart and `naira-dependencies`. The PR vCluster surfaces breaking changes.
+- Compatibility check between the `naira` chart and `test-dependencies`. The PR vCluster surfaces breaking changes.
 
-Pipelines: Naira core, Naira dependencies, staging, PR vCluster.
+Pipelines: Naira core, test dependencies, staging, PR vCluster.
 
 ### Environments
 
@@ -128,7 +128,7 @@ All on vCluster. Free tier limit: 64 CPU.
 
 `naira/deploy/charts/naira`: the product. Catalog including its plugin sidecars (plugins move to a separate repository later), ui, portal.
 
-`test-dependencies/charts/naira-dependencies`: the third-party tier. Keycloak, LiteLLM, MLflow, OpenMetadata, PostgreSQL declared as `Chart.yaml` dependencies at pinned upstream versions, vendored locally or mirrored to ECR as OCI.
+`test-dependencies/charts/test-dependencies`: the third-party tier. Keycloak, LiteLLM, MLflow, OpenMetadata, PostgreSQL declared as `Chart.yaml` dependencies at pinned upstream versions, vendored locally or mirrored to ECR as OCI.
 
 The split follows lifecycle ownership. Naira's version moves with Naira's code; the dependency tier moves on upstream upgrade cycles unrelated to a Naira release.
 
@@ -136,7 +136,7 @@ OpenBao and External Secrets Operator also live in `test-dependencies`. They boo
 
 `deploy/dev/stacks/{core/infra/kubernetes,core/infra/keycloak,mlops}` is deleted once the charts reach parity.
 
-`naira-dependencies` carries every non-first-party component with an `enabled` flag: Keycloak, LiteLLM, PostgreSQL, MLflow, OpenMetadata, llama.cpp, vLLM, kube-prometheus-stack with its ServiceMonitors, and `mcp-mock`.
+`test-dependencies` carries every non-first-party component with an `enabled` flag: Keycloak, LiteLLM, PostgreSQL, MLflow, OpenMetadata, llama.cpp, vLLM, kube-prometheus-stack with its ServiceMonitors, and `mcp-mock`.
 
 ### 2. Values-driven plugin sidecars
 
@@ -178,7 +178,7 @@ One template loop emits the containers, generates the `plugin-config` ConfigMap 
 | 10 container images | `ghcr.io/naira-project/naira-*` | the charts |
 | `naira` Helm chart | `ghcr.io/naira-project/charts/naira:X.Y.Z` | ArgoCD `source.chart`, `helm install` |
 | `naira` OCM component version | `ghcr.io/naira-project/ocm/…` | adopters, signing, `ocm transfer` |
-| `naira-dependencies` chart | `ghcr.io/naira-project/charts/naira-dependencies:A.B.C` | ArgoCD and Tilt |
+| `test-dependencies` chart | `ghcr.io/naira-project/charts/test-dependencies:A.B.C` | ArgoCD and Tilt |
 
 ArgoCD has no OCM source type; `source.chart` resolves OCI Helm only. Release CI publishes both forms from one build:
 
@@ -192,7 +192,7 @@ ArgoCD deploys a tag-pinned chart. The OCM component, the artifact that is signe
 
 A committed `Tiltfile` at the repository root, not under `deploy/dev/`, because it watches `catalog/`, `ui/`, `plugins/` and `naira-openmfp-portal/`:
 
-- `helm_resource` on `charts/naira-dependencies` from OCI with a dev values file.
+- `helm_resource` on `charts/test-dependencies` from OCI with a dev values file.
 - `helm()` on `deploy/charts/naira` with a dev values file overriding image repositories to local tags.
 - `custom_build` per Go binary: host `go build` into a thin runtime image. The `go_image` helper on `origin/tilt` is the right shape.
 - `k8s_yaml` for the dev-only manifests (`llm-inference`, `mcp-mock`).
@@ -205,7 +205,7 @@ Three root tasks are not deployment and move to `[tasks]` in `mise.toml`: `proto
 
 ### 5. ArgoCD deploys from `test-dependencies`
 
-`test-dependencies` holds the `naira-dependencies` chart source, ArgoCD `Application` and `ApplicationSet` definitions, per-environment values, and the OpenBao/ESO bootstrap. Each Application pins a chart version:
+`test-dependencies` holds the `test-dependencies` chart source, ArgoCD `Application` and `ApplicationSet` definitions, per-environment values, and the OpenBao/ESO bootstrap. Each Application pins a chart version:
 
 ```yaml
 source:
@@ -222,7 +222,7 @@ Sync waves:
 | 1 | ESO controller, OpenBao |
 | 2 | OpenBao init and seed |
 | 3 | `ClusterSecretStore`, `ExternalSecret`s |
-| 4 | `naira-dependencies` |
+| 4 | `test-dependencies` |
 | 5 | `naira` |
 
 ### 6. Repository naming
@@ -262,7 +262,7 @@ In order:
 |---|---|---|
 | 0 | Three missing plugin images published by the release path | Ten images resolve from ghcr at one tag |
 | 1 | `naira` chart reaches parity; chart CI green | Catalog pod's eight containers, plus ui and portal, healthy on kind from the chart alone; `ct install` passes |
-| 2 | `naira-dependencies` chart published | `helm install` yields Keycloak, LiteLLM, MLflow, OpenMetadata, PostgreSQL |
+| 2 | `test-dependencies` chart published | `helm install` yields Keycloak, LiteLLM, MLflow, OpenMetadata, PostgreSQL |
 | 3 | Root Tiltfile; `deploy/dev/stacks/{core/infra/kubernetes,core/infra/keycloak,mlops}` and both Taskfiles deleted; chores moved to `mise.toml` | Developer edits a plugin and sees it live; no second manifest set; `task` removed from `mise.toml` |
 | 4 | Release CI pushes OCI chart and OCM component | `helm pull oci://…` works; `ocm get componentversion` lists the chart and ten image digests |
 | 5 | ArgoCD installed; Naira synced from the OCI chart | Stack healthy; images pulled from ghcr, not side-loaded |
@@ -284,10 +284,3 @@ Phases 0-4 are `naira` work; phases 5-7 are `test-dependencies` and cluster work
 | Kustomize overlays instead of charts | Third-party tier ships as Helm charts; adopters expect a chart |
 | Chart from a git path instead of a registry | Deploys a git reference, not a released artifact; nothing for OCM to reference |
 | Keep the Taskfile for cluster lifecycle and seeding | Tilt covers seeding with `resource_deps`; what remains is two `kind` commands and three chores |
-
-## Open Questions
-
-1. Which environments does `test-dependencies` hold at the start: testbed only, or testbed plus a staging vCluster?
-2. Is the `naira-dependencies` chart versioned independently, or does it track the Naira minor it was validated against?
-3. Dev-only components: §1 puts llama.cpp, vLLM and `mcp-mock` in `naira-dependencies` behind `enabled` flags; §4 applies `llm-inference` and `mcp-mock` as raw manifests with `k8s_yaml`, and Phase 3 keeps `deploy/dev/stacks/llm-inference`. Which one?
-4. `mcp-mock` has no published image (P1) and no prerequisite publishes it. Where does its image come from outside a local Tilt build?
