@@ -255,7 +255,7 @@ In order:
 3. Chart CI: `helm lint`, `ct lint`, `ct install`, OCI push, OCM build.
 4. Remove plaintext secrets from the charts' default path (P4). The `ExternalSecret` shape in `test-dependencies` is the model.
 
-## Migration
+## Next Steps
 
 | Phase | Outcome | Verified by |
 |---|---|---|
@@ -269,17 +269,3 @@ In order:
 | 7 | Repositories renamed (done on GitHub) | No stale source URLs in cluster resources |
 
 Phases 0-4 are `naira` work; phases 5-7 are `test-dependencies` and cluster work.
-
-## Alternatives
-
-| Alternative | Rejected because |
-|---|---|
-| One chart including dependencies | Couples a Naira release to upstream OpenMetadata and Keycloak bumps; ships adopters a LiteLLM and PostgreSQL they already run |
-| OCM consumed by an in-cluster controller | Adds a controller right after retiring one; maturity not assessed |
-| ArgoCD config management plugin running `ocm` | Every repo-server needs the plugin and registry access; render failures become sync failures |
-| Plain OCI Helm without OCM | No registry relocation or component-level signing for adopters |
-| Keep Flux | Team chose ArgoCD: UI for a platform-engineer audience, `ApplicationSet` PR generator for per-PR environments |
-| Flux and ArgoCD side by side permanently | Two reconcilers, two failure modes |
-| Kustomize overlays instead of charts | Third-party tier ships as Helm charts; adopters expect a chart |
-| Chart from a git path instead of a registry | Deploys a git reference, not a released artifact; nothing for OCM to reference |
-| Keep the Taskfile for cluster lifecycle and seeding | Tilt covers seeding with `resource_deps`; what remains is two `kind` commands and three chores |
