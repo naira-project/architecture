@@ -8,14 +8,14 @@
 | Status           | Proposed                                       |
 | Type             | Feature                                        |
 | Created          | 2026-09-11                                     |
-| Updated          | 2026-09-17                                     |
+| Updated          | 2026-09-18                                     |
 
 ## Summary
 
 Naira has four ways to deploy itself and no single one an end user can consume. This RFC proposes:
 
 - Two versioned Helm charts: `naira` (first-party components) and `test-dependencies`.
-- Each published twice per release: as an OCI Helm chart that ArgoCD consumes, and inside an OCM component version carrying image digests, for signing and registry relocation.
+- Each published per release as an OCI Helm chart that ArgoCD consumes. An OCM component version carrying image digests, for signing and registry relocation, follows once OCM's Helm chart support is confirmed.
 - ArgoCD deploys both from `test-dependencies`, pinned to chart versions.
 - Tilt renders the same charts for the inner development loop.
 - Flux is dropped completely.
@@ -90,7 +90,7 @@ Each encodes its own deployment order.
 
 - One definition of what a Naira deployment is, consumed by every environment.
 - That definition is a versioned, immutable release artifact.
-- An external adopter can install Naira into their own cluster from published artifacts, including into a private or air-gapped registry (via OCM).
+- An external adopter can install Naira into their own cluster from published artifacts, including into a private or air-gapped registry (via OCM, pending confirmation of its Helm chart support).
 - The inner development loop stays fast and renders the same definition (via Tilt).
 - Secrets are never committed in any path.
 - One tool per job: Helm defines, ArgoCD reconciles, Tilt develops.
@@ -146,6 +146,10 @@ catalog:
   image:
     repository: ghcr.io/naira-project/naira-catalog
     tag: ""                    # empty -> .Chart.AppVersion
+  pluginDefaults:
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { cpu: 200m, memory: 128Mi }
   plugins:
     - name: litellm
       enabled: true
@@ -153,18 +157,31 @@ catalog:
         repository: ghcr.io/naira-project/naira-plugin-litellm
         tag: ""
       port: 50051
+      schedule: "0 0 * * *"
       env: []
     - name: depl-calls-svc
       enabled: true
       image:
         repository: ghcr.io/naira-project/naira-plugin-depl-calls-svc
         tag: ""
-      port: 50051
+      port: 50053
+      schedule: "0 * * * *"
+      resources: {}            # optional; merged over pluginDefaults.resources
       rbac:
-        rules: []              # needs cluster read via DEPL_CALLS_SVC_KUBECONFIG
+        rules:
+          - apiGroups: [""]
+            resources: ["namespaces", "services"]
+            verbs: ["get", "list"]
+          - apiGroups: ["apps"]
+            resources: ["deployments"]
+            verbs: ["get", "list"]
 ```
 
-One template loop emits the containers, generates the `plugin-config` ConfigMap from the same list, and aggregates every `rbac.rules` entry into one Role and RoleBinding. `depl-calls-svc` and `depl-uses-litellm` require cluster read access, so RBAC belongs to the plugin entry, not to a fixed template.
+One template loop emits the containers and generates the `plugin-config` ConfigMap (`address: localhost:<port>`, `schedule`) from the same list. For each plugin with `rbac.rules`, it emits a ClusterRole and a ClusterRoleBinding to the catalog ServiceAccount. `depl-calls-svc`, `depl-uses-litellm` and `fluxcd` read cluster-scoped and cross-namespace resources, so a namespaced Role is insufficient. RBAC belongs to the plugin entry, not to a fixed template.
+
+Plugin sidecars share the pod's network namespace. Ports must be unique; the chart fails rendering on a duplicate.
+
+Each plugin's resources are `pluginDefaults.resources` with its own `resources` merged over them. The defaults match the current manifests; overrides are for heavier plugins. The pod's scheduling request is the sum across the catalog and every enabled plugin.
 
 `enabled: false` drops a plugin. That is how an adopter runs a subset.
 
@@ -176,16 +193,18 @@ One template loop emits the containers, generates the `plugin-config` ConfigMap 
 |---|---|---|
 | 10 container images | `ghcr.io/naira-project/naira-*` | the charts |
 | `naira` Helm chart | `ghcr.io/naira-project/charts/naira:X.Y.Z` | ArgoCD `source.chart`, `helm install` |
-| `naira` OCM component version | `ghcr.io/naira-project/ocm/…` | adopters, signing, `ocm transfer` |
+| `naira` OCM component version | `ghcr.io/naira-project/ocm/…` | adopters, signing, `ocm transfer` (gated, see below) |
 | `test-dependencies` chart | `ghcr.io/naira-project/charts/test-dependencies:A.B.C` | ArgoCD and Tilt |
 
-ArgoCD has no OCM source type; `source.chart` resolves OCI Helm only. Release CI publishes both forms from one build:
+ArgoCD has no OCM source type; `source.chart` resolves OCI Helm only. Release CI runs `helm package` and `helm push`. ArgoCD, `helm install` and CI consume that chart without OCM.
 
-1. `helm package` and `helm push` the chart.
-2. `ocm add componentversions`: a component descriptor referencing that chart and every image, each tag resolved to a digest.
-3. `ocm transfer` to the release registry.
+The OCM component version is gated on confirmation from the OCM developers:
 
-ArgoCD deploys a tag-pinned chart. The OCM component, the artifact that is signed and relocated, is digest-pinned.
+1. Can a component version carry an OCI Helm chart as a resource, by reference or as a local blob?
+2. After `ocm transfer`, can `helm pull` consume the relocated chart?
+3. Are the chart's image references localized to the target registry, or does the adopter override `image.repository`?
+
+Once confirmed, release CI adds `ocm add component-version` (a descriptor referencing the chart and every image, each tag resolved to a digest) and `ocm transfer` to the release registry. ArgoCD deploys a tag-pinned chart; the OCM component, the artifact that is signed and relocated, is digest-pinned.
 
 ### 4. Tilt
 
@@ -239,7 +258,7 @@ The `naira*` prefix is reserved for Naira core. All repositories follow this con
 
 | Audience | Path |
 |---|---|
-| Adopter | `helm install oci://ghcr.io/naira-project/charts/naira`, their own ArgoCD, or `ocm transfer` into a private registry first |
+| Adopter | `helm install oci://ghcr.io/naira-project/charts/naira`, their own ArgoCD, or `ocm transfer` into a private registry first (after phase 8) |
 | Naira developer, inner loop | Tilt |
 | Naira developer, verifying the GitOps path | ArgoCD on kind against published images |
 | CI | `helm install`, non-interactive |
@@ -252,7 +271,7 @@ In order:
 
 1. Add `naira-plugin-depl-uses-litellm`, `naira-plugin-openmetadata` and `naira-plugin-mcp-servers` to `release-please.yml` (P3). `dev-publish.yml` already builds all three.
 2. Values-driven plugin sidecars in the `naira` chart (P2). Everything else depends on the chart describing a working catalog.
-3. Chart CI: `helm lint`, `ct lint`, `ct install`, OCI push, OCM build.
+3. Chart CI: `helm lint`, `ct lint`, `ct install`, OCI push.
 4. Remove plaintext secrets from the charts' default path (P4). The `ExternalSecret` shape in `test-dependencies` is the model.
 
 ## Next Steps
@@ -263,9 +282,10 @@ In order:
 | 1 | `naira` chart reaches parity; chart CI green | Catalog pod's eight containers, plus ui and portal, healthy on kind from the chart alone; `ct install` passes |
 | 2 | `test-dependencies` chart published | `helm install` yields Keycloak, LiteLLM, MLflow, OpenMetadata, PostgreSQL |
 | 3 | Root Tiltfile; `deploy/dev/stacks/{core/infra/kubernetes,core/infra/keycloak,mlops}` and both Taskfiles deleted; chores moved to `mise.toml` | Developer edits a plugin and sees it live; no second manifest set; `task` removed from `mise.toml` |
-| 4 | Release CI pushes OCI chart and OCM component | `helm pull oci://…` works; `ocm get componentversion` lists the chart and ten image digests |
+| 4 | Release CI pushes OCI chart | `helm pull oci://…` works |
 | 5 | ArgoCD installed; Naira synced from the OCI chart | Stack healthy; images pulled from ghcr, not side-loaded |
 | 6 | OpenBao, ESO, MLflow, LiteLLM migrated off Flux; Makefile retired | `ExternalSecret`s still resolve; Flux uninstalled |
 | 7 | Repositories renamed (done on GitHub) | No stale source URLs in cluster resources |
+| 8 | Release CI pushes OCM component; gated on the OCM questions in section 3 | `ocm get component-version` lists the chart and ten image digests; `ocm transfer` then `helm install` from the target registry works |
 
-Phases 0-4 are `naira` work; phases 5-7 are `test-dependencies` and cluster work.
+Phases 0-4 and 8 are `naira` work; phases 5-7 are `test-dependencies` and cluster work.
