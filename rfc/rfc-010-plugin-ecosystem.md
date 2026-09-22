@@ -86,15 +86,43 @@ Pros: shared release/tooling lowers the barrier for contributors while giving ow
 Cons: still a single large repo we host and keep CI green for, and contributors must work inside our repo rather than their own.
 
 ## Compact comparison
-Model	Where code lives	Core-team load	Quality floor	Compat signal	Enterprise mirroring	Precedent
-A. Central monorepo	Naira repo	High (owns all)	High but manual	Strong (uniform CI)	N/A (build from source)	Early Backstage, OTel contrib
-B. External listing	Owner repo	Very low	None	None	Ad hoc	Daggerverse
-C. Metadata index	Owner registry	Low/medium (owns schema)	Via tiers + tests	Explicit field	Excellent (digest refs)	Krew, Terraform, Artifact Hub, MCP
-D. Community-plugins repo	Naira repo (workspaces)	Medium	Shared tooling	Good	Moderate	Backstage community-plugins
+
+| Model | Where code lives | Core-team load | Quality floor | Compat signal | Enterprise mirroring | Precedent |
+|---|---|---|---|---|---|---|
+| A. Central monorepo | Naira repo | High (owns all) | High but manual | Strong (uniform CI) | N/A (build from source) | Early Backstage, OTel contrib |
+| B. External listing | Owner repo | Very low | None | None | Ad hoc | Daggerverse |
+| C. Metadata index | Owner registry | Low/medium (owns schema) | Via tiers + tests | Explicit field | Excellent (digest refs) | Krew, Terraform, Artifact Hub, MCP |
+| D. Community-plugins repo | Naira repo (workspaces) | Medium | Shared tooling | Good | Moderate | Backstage community-plugins |
 
 ## Proposal: a hybrid centered on a thin plugin index
 
 I think Option C as the backbone, borrowing Option D's per-plugin ownership and shared tooling and keeping Option A only for the reference plugins during the current phase where the API still moves. 
+
+```mermaid
+flowchart LR
+  subgraph C["Contributor / Vendor"]
+    repo["Plugin repo<br/>own release process"]
+    ci["CI: build, conformance kit,<br/>cosign sign"]
+    reg["Owner registry<br/>image@sha256"]
+    repo --> ci --> reg
+  end
+ 
+  subgraph N["Naira project"]
+    index["plugin-index<br/>one naira-plugin.yaml per plugin"]
+    cat["Catalog on naira website<br/>Official / Verified / Community"]
+    index --> cat
+  end
+ 
+  subgraph U["User / Enterprise"]
+    core["Naira core"]
+    mir["Internal registry<br/>Harbor / Artifactory"]
+  end
+ 
+  ci -- "PR: manifest with digest,<br/>API range, tier" --> index
+  cat -- "discover, resolve manifest" --> core
+  reg -- "pull by digest" --> core
+  reg -- "naira mirror:<br/>images, signatures, SBOMs" --> mir --> core
+```
 
 **How this would looks like?**
 
