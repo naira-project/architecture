@@ -6,9 +6,9 @@ However, right now the way plugins are managed is an intermediate solution. Ther
 
 ## Overarching Idea
 
-The core of Naira is responsable for connecting different plugins, running its entity model and provide a unified API to interact with Naira and every assoziated tool. 
+The core of Naira is responsable for connecting different plugins, running its entity model and provide a unified API to interact with Naira and every associated tool. 
 
-Plugins on the other hand are providing access and retrieving information from a specific tool/software/system/platform. This can be practically anything, ideally its limited to the context of AI Engineering. As there is an almost unlimited number of solutions out there, it's not the purpose of the Naira development team to create for any tool a plugin. Our focus is on building a baseline and then extend the core, rather to built a holistic ecosystem.
+Plugins on the other hand are providing access and retrieving information from a specific tool/software/system/platform. This can be practically anything, ideally it's limited to the context of AI Engineering. As there is an almost unlimited number of solutions out there, it's not the purpose of the Naira development team to create for any tool a plugin. Our focus is on building a baseline and then extend the core, rather to built a holistic ecosystem.
 
 This means, that contributors and plugin providers need a place where a) to push a plugin, and where b) consumer can find plugins and bring them to Naira.
 
@@ -19,7 +19,7 @@ The organizational part is kinda simple:
 - every plugin has an own folder
 - the README.md is also an index file where Plugins are listed with relevant information and maybe categorized
 
-We for sure will need to implement a couple of rules and approaches, e.g. every PR can only touch one plugin folder, or every plugin versions for it self. 
+We for sure will need to implement a couple of rules and approaches, e.g. every PR can only touch one plugin folder, or  plugin versions. 
 
 However, this approach has several issues, like: an official versioning is hard, we might not be able to really handle docens of plugins as when the code moves to our repository we take also ownership, and this last part comes most compliated into the game. 
 
