@@ -8,7 +8,7 @@ However, right now the way plugins are managed is an intermediate solution. Ther
 
 The core of Naira is responsable for connecting different plugins, running its entity model and provide a unified API to interact with Naira and every associated tool. 
 
-Plugins on the other hand are providing access and retrieving information from a specific tool/software/system/platform. This can be practically anything, ideally it's limited to the context of AI Engineering. As there is an almost unlimited number of solutions out there, it's not the purpose of the Naira development team to create for any tool a plugin. Our focus is on building a baseline and then extend the core, rather to built a holistic ecosystem.
+Plugins on the other hand are providing access and retrieving information from a specific tool/software/system/platform. This can be practically anything, ideally it's limited to the context of AI Engineering. As there is an almost unlimited number of solutions out there, it's not the purpose of the Naira development team to create for any tool a plugin. Our focus is on building a baseline and then extending the core, rather than creating a holistic ecosystem from the start.
 
 This means, that contributors and plugin providers need a place where a) to push a plugin, and where b) consumer can find plugins and bring them to Naira.
 
@@ -84,6 +84,15 @@ A dedicated Naira-owned repository where each plugin is a workspace with its own
 Pros: shared release/tooling lowers the barrier for contributors while giving owners autonomy and per-plugin CODEOWNERS distributes review. 
 
 Cons: still a single large repo we host and keep CI green for, and contributors must work inside our repo rather than their own.
+
+### Option E: Two distinguished organizations
+
+Maintaining under one organization the core components of Naira, while managing in a second organization the community/plugin-provider delivered artifacts and code. 
+
+Pros: Core development and plugins are clearly separated. 
+
+Cons: High maintenance efforts: two organizations needs to be kept in sync with contrib rights, quality, maintainer and governance. Semi-official code falls back into our responsability. Might end up in a large org with hundreds of repos.
+
 
 ## Compact comparison
 
