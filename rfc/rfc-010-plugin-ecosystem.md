@@ -96,12 +96,13 @@ Cons: High maintenance efforts: two organizations needs to be kept in sync with 
 
 ## Compact comparison
 
-| Model | Where code lives | Core-team load | Quality floor | Compat signal | Enterprise mirroring | Precedent |
+| Model | Where code lives | Core-team load | Quality floor | Compatability signal | Enterprise mirroring | Precedent |
 |---|---|---|---|---|---|---|
 | A. Central monorepo | Naira repo | High (owns all) | High but manual | Strong (uniform CI) | N/A (build from source) | Early Backstage, OTel contrib |
 | B. External listing | Owner repo | Very low | None | None | Ad hoc | Daggerverse |
 | C. Metadata index | Owner registry | Low/medium (owns schema) | Via tiers + tests | Explicit field | Excellent (digest refs) | Krew, Terraform, Artifact Hub, MCP |
 | D. Community-plugins repo | Naira repo (workspaces) | Medium | Shared tooling | Good | Moderate | Backstage community-plugins |
+| E. Multi-Org with Community Repos | Naira repo (core) and Community Repo in another Org | Medium-High | Via tiers + shared tooling | Good | Ad hoc | NixOS |
 
 ## Proposal: a hybrid centered on a thin plugin index
 
