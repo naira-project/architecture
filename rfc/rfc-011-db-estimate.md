@@ -60,7 +60,7 @@ Then:
 
 ### Where the numbers come from
 
-- **`P` (plugins).** We have about 10 plugins today. Backstage has 258 active plugins, so a hard upper bound is around 300. In practice a customer uses only a few concrete tools (IIRC Max was saying one time that customers are usually happy with 3 or 4 specific to their needs), so 100 plugins per cluster is a safe margin. We use `P = 10^2` as the maximum for this discussion.
+- **`P` (plugins).** We have about 10 plugins today. Backstage has 258 active plugins. In practice a customer doesn't use every tool in a market per cluster (IIRC Max was saying one time that customers are usually happy with 3 or 4 specific plugins to their needs), so 100 plugins per cluster is a safe margin. We use `P = 10^2` as the maximum for this discussion.
 - **`C` (clusters).**
 - **`N` (nodes per plugin run).**
 - **`R` (relations per node).** 
@@ -129,12 +129,13 @@ dominate.
 
 ## Proposed limits
 
-The purpose of limits is mainly to guide plugin authors so they build plugins that scale easily. We should set these limits in the codebase and reject snapshots that exceed them. When a plugin hits a limit, we should determine whether it's an unintended bug from the plugin, or if the catalog should increase or redesign the limits.
+The main purpose of these limits is to guide plugin authors toward building plugins that scale easily, as well as to catch and reject plugin runs with logic errors that cause them to send an enormous amount of data.
+We should set these limits in the codebase and reject snapshots that exceed them. When a plugin hits a limit, we should determine whether it's an unintended bug from the plugin, or if the catalog should increase or redesign the limits.
 
 | Limit | Value | Reasoning |
 |---|---|---|
 | `kind` length | 40 B | The longest kind today has 21 characters. It is a string defined by the plugin author, so it is easy to fit. Maybe even set limit to 30 B. |
-| `path` length | 300 B | The longest path today is a GitHub repo id (max ~100 characters) plus a prefix of ~10 characters. The value is a proposal and can change when a plugin justifies more. Plugin author only decide what is identificator of reasource, but length of it depends on source system, that's why there should be some buffer |
+| `path` length | 300 B | The longest path today is a GitHub repo id (max ~100 characters) plus a prefix of ~10 characters. This value is a proposal and can change if a plugin justifies needing more. Plugin authors only decide what the identifier of a resource is, but its length depends on the source system—which is why there should be some buffer. |
 | Whole plugin response (one plugin, one cluster) | 10 MB | Main limit, see below. |
 
 We could set limits on things like:
@@ -159,9 +160,11 @@ Take a snapshot: 1000 nodes, each with ~600 B of JSON, and 10 relations per node
 | `relations` | 10^3 x 10^1 = 10^4 | 10^2 | 10^6 B |
 | `relation_plugin_claims` | 10^4 | 10^2 | 10^6 B |
 
-Total: about 3 x 10^6 B. Mentioned run uses about 3 MB.
+Total: about 3 x 10^6 B. The mentioned run uses about 3 MB, comparing to it 10 MB doesn't look as a particularly high limit.
+However, this run with 600 B JSON per node represents an upper bound, and it will probably take a long time before we actually see a run like that on real data.
+That's why I think 10 MB will be enough for the time being
 
 ## Notes
 
-- **Plugin sizes in other tools.** OpenMetadata can produce a gigantic number of nodes. Its public benchmark was done with 10,000, 100,000 and 1.8M entities, representing a small, medium and large organization ([benchmark](https://blog.open-metadata.org/openmetadata-benchmarking-3120782f8a12)). I do not know if this is representative for us. Max what do you thinks? Models, MCP servers and deployments look like more limited sets of data.
-- **Number of `kinds` per plugin.** Not needed for the estimate, only the number of nodes matters. We do not propose a limit here. For me plugin with many kinds is a signal that it should be split into several smaller plugins, which also makes it easier to test.
+- **Plugin sizes in other tools.** OpenMetadata can produce a significant number of nodes. Its public benchmark was done with 10,000, 100,000 and 1.8M entities, representing a small, medium and large organization ([benchmark](https://blog.open-metadata.org/openmetadata-benchmarking-3120782f8a12)). I do not know if this is representative for us. Max what do you think? Models, MCP servers and deployments look like more limited sets of data.
+- **Number of `kinds` per plugin.** Not needed for the estimate only the number of nodes matters. I'm not proposing a limit here. A large number of nodes would simply be a signal that it could be split into several smaller plugins, which would also make it easier to test.
