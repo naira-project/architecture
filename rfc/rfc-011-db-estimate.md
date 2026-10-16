@@ -168,3 +168,19 @@ That's why I think 10 MB will be enough for the time being
 
 - **Plugin sizes in other tools.** OpenMetadata can produce a significant number of nodes. Its public benchmark was done with 10,000, 100,000 and 1.8M entities, representing a small, medium and large organization ([benchmark](https://blog.open-metadata.org/openmetadata-benchmarking-3120782f8a12)). I do not know if this is representative for us. Max what do you think? Models, MCP servers and deployments look like more limited sets of data.
 - **Number of `kinds` per plugin.** Not needed for the estimate only the number of nodes matters. I'm not proposing a limit here. A large number of nodes would simply be a signal that it could be split into several smaller plugins, which would also make it easier to test.
+
+## Notes from Max
+
+Max's feedback helps put their customers scale into context:
+
+- **Expected number of plugins.** Based on typical Backstage usage, we can usually expect around 10–15 plugins running on a cluster. Naira-specific plugins could add approximately 10 more. This suggests a typical total of roughly 20–25 plugins per cluster. The estimate uses `P = 10^2`, so the current model already includes a conservative margin above this expected range.
+
+- **Reasonable database size.** In many companies, around 50 GB is available by default for a database. Large customers may reasonably give hundreds of gigabytes or even terabytes.
+
+- **Filtering reduces the number of nodes.** We can filter out resources such as sidecars and observability containers. This should reduce the number of containers represented in the catalog and therefore reduce `N`, the number of nodes emitted by a plugin.
+
+- **Large-customer deployment scenarios.** Max described two possible scenarios:
+  - With a few clusters, a customer may typically have around 1,000 deployments, with a maximum of approximately 10,000 deployments.
+  - With around 200 clusters, a customer may typically have hundreds of deployments per cluster, with a maximum of approximately 1,000 deployments per cluster.
+
+- **Implication for the stretch scenario.** If the **Stretch (more clusters)** scenario uses `N = 10^4` instead of `N = 10^3`, its estimate increases by a factor of 10, from ~10 GB to ~100 GB.
