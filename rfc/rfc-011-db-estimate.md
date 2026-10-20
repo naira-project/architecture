@@ -30,7 +30,15 @@ We count two kinds of rows:
 - a **node row** is a node together with one plugin claim on it (`nodes` + `node_plugin_claims`),
 - a **relation row** is a relation together with one plugin claim on it (`relations` + `relation_plugin_claims`).
 
-Counting a node and its claim together is a simplification, explained in the [rationale](#bytes-per-row-rationale) below.
+Counting a node and its claim together is a simplification, explained in the [Bytes per row rationale](#bytes-per-row-rationale) below.
+
+### Bytes per row
+| Row | Consists of | Bytes per row |
+|---|---|---|
+| node row | `nodes` + `node_plugin_claims` | 10^3 |
+| relation row | `relations` + `relation_plugin_claims` | 5 x 10^2 |
+
+The row sizes include the indexes and leave room for the JSON `properties` of a claim.
 
 The row sizes were calculated from the proposed schema:
 
@@ -75,16 +83,7 @@ This schema is taken from [PR 247](https://github.com/naira-project/naira/pull/2
 
 </details>
 
-<a name="bytes-per-row"></a>
-
-| Row | Consists of | Bytes per row |
-|---|---|---|
-| node row | `nodes` + `node_plugin_claims` | 10^3 |
-| relation row | `relations` + `relation_plugin_claims` | 5 x 10^2 |
-
-The row sizes include the indexes and leave room for the JSON `properties` of a claim.
-
-<a name="bytes-per-row-rationale"></a>
+<a id="bytes-per-row-rationale"></a>
 
 <details>
 
@@ -122,7 +121,7 @@ At the schema caps (`kind` 40 B, `plugin_name` 40 B) both rows are ≈ 40 B bigg
 ## Assumptions
 
 1. We estimate the **current state only**. Old snapshots are not stored. If we decide to keep them, every number below is multiplied by the number of retained snapshots.
-2. If several plugins report the same object, there are fewer rows in `nodes` and `relations`. We ignore that (see the [rationale](#bytes-per-row-rationale)), so the estimate is an **upper bound**.
+2. If several plugins report the same object, there are fewer rows in `nodes` and `relations`. We ignore that (see the [Bytes per row rationale](#bytes-per-row-rationale)), so the estimate is an **upper bound**.
 3. The row sizes from [Bytes per row](#bytes-per-row) are upper limits: they include ≈ 500 B of JSON per node and ≈ 150 B per relation (only ≈ 30 B and ≈ 70 B if `kind` and `path` are at their caps).
 
 ## How many rows
@@ -230,7 +229,7 @@ The limit applies to the whole response, so it bounds everything inside it at on
 
 Questions from [@akavel-reply's comment](https://github.com/naira-project/naira/pull/247/changes#r4249078169):
 
-- **How many plugins might we have?** At most about 100 (`P = 10^2`), and typically around 25 per cluster. See [Where the numbers come from](#where-the-numbers-come-from).
+- **How many plugins might we have?** At most about 100 (`P = 10^2`), and typically around 25 per cluster. See [Where the numbers come from](#where-numbers-come).
 - **How many kinds of nodes could a plugin emit?** This is not needed for the estimate, only the number of nodes matters. We do not propose a limit.
 - **How long a `kind` and a `path` do we allow?** 40 B and 300 B. See [Proposed limits](#proposed-limits).
 - **How many nodes can a plugin emit, how much space do we allow per JSON `properties` blob, and how many relations do we allow?** We do not try to calculate exact values for these. One limit on the whole response of a plugin run (10 MB) bounds all of them together, see [Why 10 MB](#why-10-mb).
