@@ -188,7 +188,7 @@ These limits discourage excessive output from a single plugin; they do **not** e
 |---|---|---|
 | `kind` length | 40 B | The longest kind today has 21 characters. Plugin authors control this string. |
 | `path` length | 300 B | The longest path today is a GitHub repo id (~100 characters) plus a prefix (~10). Leave headroom for identifiers from other source systems. |
-| Serialized response (one plugin, one cluster) | 4 MiB | Retain the existing gRPC receive limit; no additional storage budget (option D). |
+| Plugin run response (one plugin, one cluster) | 4 MiB | Retain the existing gRPC receive limit; no additional storage budget (option B). |
 
 Hitting limits reject the whole snapshot and keep the last successful one.
 
@@ -228,6 +228,8 @@ If every plugin–cluster pair simultaneously reached that size:
 | Stretch (more clusters) | 10,000 | ~400 GB |
 
 ### How big is a plugin response on the wire?
+
+The database scenarios above estimate aggregate storage, but they do not show whether one plugin run fits within the current **4 MiB** gRPC message limit. This section estimates response sizes for representative node and relation counts, compares them with that limit, and shows which scenarios may require a higher limit or support for chunked responses.
 
 The 4 MiB limit applies to **one gRPC message**: the response of one plugin run on one cluster. So `P` and `C` do not matter here, only `N` (nodes per run) and `R` (relations per node). To keep the arithmetic easy we round 4 MiB to **4 x 10^6 B** (the real limit is 4,194,304 B, about 5% more).
 
@@ -273,8 +275,7 @@ As soon as there are relations, they dominate.
 
 What we can read from this:
 
-The 4 MiB limit does **not** cover the larger scenarios. To cover them we will need to raise the limit.
-
+The 4 MiB limit does **not** cover the larger per-run scenarios shown above. If plugins need to send responses of those sizes, we will need to raise the limit or support chunked responses.
 
 ## Answers to the review questions
 
@@ -283,8 +284,8 @@ Questions from [@akavel-reply's comment](https://github.com/naira-project/naira/
 - **How many plugins might we have?** At most about 100 (`P = 10^2`), and typically around 25 per cluster. See [Where the numbers come from](#where-numbers-come).
 - **How many kinds of nodes could a plugin emit?** This is not needed for the estimate, only the number of nodes matters. We do not propose a limit.
 - **How long a `kind` and a `path` do we allow?** 40 B and 300 B. See [Proposed limits](#proposed-limits).
-- **How many nodes can a plugin emit, how much space do we allow per JSON `properties` blob, and how many relations do we allow?** We do not try to calculate exact values for these. One limit on the whole response of a plugin run (10 MB) bounds all of them together, see [Why 10 MB](#why-10-mb).
-- **What if a single plugin needs more than the limit?** The limit can be configured per plugin, so a plugin that needs more can get an explicitly higher one.
+- **How many nodes can a plugin emit, how much space do we allow per JSON `properties` blob, and how many relations do we allow?** We do not set separate limits for these. The current **4 MiB** gRPC message limit bounds the complete response from one plugin run; see [Proposed limits](#proposed-limits) and [How big is a plugin response on the wire?](#how-big-is-a-plugin-response-on-the-wire).
+- **What if a single plugin needs more than the limit?** We can raise the limit, potentially per plugin, or support chunked responses.
 
 ## Notes from Max
 
