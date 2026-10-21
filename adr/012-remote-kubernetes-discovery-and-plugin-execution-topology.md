@@ -99,7 +99,8 @@ The main rule is that **Model D is one collection system with two ways to run pl
 - [Spike overview](https://github.com/naira-project/spikes/tree/main/spikes/014-remote-k8s-discovery-and-plugin-execution)
 - [Spike recommendations and project findings](https://github.com/naira-project/spikes/blob/main/spikes/014-remote-k8s-discovery-and-plugin-execution/docs/summary.md)
 - [Final team decision](https://github.com/naira-project/spikes/blob/main/spikes/014-remote-k8s-discovery-and-plugin-execution/docs/decision.md)
-- [Target architecture diagram](assets/adr-012-diagram.png)
+- [Target architecture layout](assets/adr-012-diagram.png)
+- [Model A/B/C/D diagram](https://github.com/naira-project/spikes/blob/main/spikes/014-remote-k8s-discovery-and-plugin-execution/docs/model_a_b_c_d.excalidraw)
 
 ## Notes & Review Comments
 - The team's final decision replaces the earlier idea that Model C might eventually replace Model A.
