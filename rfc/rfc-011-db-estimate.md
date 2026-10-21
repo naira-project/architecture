@@ -182,7 +182,7 @@ Stretch is the early game scenario with 10 times more clusters, so everything is
 
 ## Proposed limits
 
-These limits discourage excessive output from a single plugin; they do **not** enforce the database estimates above. Hitting a limit should prompt a review: is this a plugin bug, unnecessary data, or a legitimate need for more room? Reject the whole snapshot and keep the last successful one..
+These limits discourage excessive output from a single plugin; they do **not** enforce the database estimates above. Hitting a limit should prompt a review: is this a plugin bug, unnecessary data, or a legitimate need for more room? 
 
 | Limit | Value | Reasoning |
 |---|---|---|
@@ -190,35 +190,30 @@ These limits discourage excessive output from a single plugin; they do **not** e
 | `path` length | 300 B | The longest path today is a GitHub repo id (~100 characters) plus a prefix (~10). Leave headroom for identifiers from other source systems. |
 | Serialized response (one plugin, one cluster) | 4 MiB | Retain the existing gRPC receive limit; no additional storage budget (option D). |
 
+Hitting limits reject the whole snapshot and keep the last successful one.
+
 ### Limit on plugin run size: options
 
-**Choose option D for now.** The alternatives below remain possible if real plugin output shows a need for finer guardrails.
+**Proposal:** for now, the only limit on the size of a plugin run is the gRPC message size limit (option B). It does not guarantee the size in the database, and we accept that for the early game. If real plugin output shows the need, we can add finer guardrails (options A or C).
 
 #### Option A: limit parts (JSON per claim, nodes per run, relations per node)
 
 - **Pros:** simple checks; catches specific problems such as one huge JSON blob.
 - **Cons:** rigid trade-offs. Small JSON limits suit many small relations but block a few rich ones; count limits do the reverse.
 
-#### Option B: introduce a configurable transport limit
+#### Option B: limit the response size with the gRPC message limit (proposed)
 
-Cap the serialized plugin response at an explicitly chosen size using gRPC message-size settings.
+The catalog rejects any plugin response bigger than the gRPC receive limit. The default is **4 MiB** ([grpc-go default](https://github.com/grpc/grpc-go/blob/679b224109d3373eb0e4d80b6e41aafc8d295b6d/server.go#L448)). If a plugin needs more, we can raise the limit (a configuration value, possibly per plugin) or send the response in chunks.
 
-- **Pros:** simple, rejects oversized responses before decoding; plugins can trade object count against payload size.
-- **Cons:** response size does not reliably predict database size. To compare them, synthetic plugin responses were generated with **5,000–20,000 nodes**, **1–20 relations per node**, and varying kind, paths lengths and properties payloads. Each response was measured in its serialized protobuf form, applied through the proposed schema, and compared with the PostgreSQL size of the resulting tables and indexes. Across these scenarios, the stored data occupied **about 1–10 times** the response size; the highest ratios occurred with short identifiers and empty properties, where fixed row and index overhead dominated.
+- **Pros:** nothing new to implement or calibrate; oversized responses are rejected before decoding; plugin authors can freely trade the number of objects against the size of the payload.
+- **Cons:** response size does not reliably predict database size. To compare them, we generated synthetic plugin responses with **5,000–20,000 nodes**, **1–20 relations per node** and varying sizes of kinds, paths and properties. We measured each response in its serialized protobuf form, applied it through the proposed schema, and compared it with the PostgreSQL size of the resulting tables and indexes. The database was ~**1–10 times** the response size after insertion. The highest ratios occur with short identifiers and empty properties, where the fixed row and index overhead dominates. Extrapolating these ratios, a 4 MiB response may need roughly 4–40 MB in the database. So the scenario estimates in this RFC are planning numbers, not guarantees.
 
 #### Option C: estimate storage before inserting and limit the estimate
 
-A candidate rule is **400 B per object + 2 × its text bytes** (kind, path where present, plugin name and properties). A threshold such as 10 MB would be a proposed guardrail, not a requirement derived from the scenarios.
+After decoding the response and before writing to the database, add up a charge per object and reject the snapshot above a threshold, for example 10 MB. A candidate rule is **400 B per object + 2 x its text bytes** (kind, path where present, plugin name and properties).
 
-- **Pros:** closer to storage size than wire size.
-- **Cons:** extra accounting and maintenance. Will require revisiting fixed values after schema/index changes. Require validation if fixed values are correct
-
-#### Option D: no additional run limit, keep only the 4 MiB transport limit (selected)
-
-Retain the existing **4 MiB** gRPC receive limit ([grpc-go default](https://github.com/grpc/grpc-go/blob/679b224109d3373eb0e4d80b6e41aafc8d295b6d/server.go#L448)). Do not add per-claim JSON/count limits or a database-charge check yet.
-
-- **Pros:** no new limit mechanism to implement or calibrate; already makes excessive output harder while allowing different graph shapes.
-- **Cons:** a response can pass this check and still cost much more in the database. It does not ensure that any scenario estimate is met.
+- **Pros:** closer to the real storage size than the wire size.
+- **Cons:** extra accounting and maintenance. The fixed values must be revisited after schema or index changes, and validated against real data before we can rely on them.
 
 ### What the selected limit could mean for storage
 
