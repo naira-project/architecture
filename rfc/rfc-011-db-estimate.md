@@ -233,45 +233,48 @@ The database scenarios above estimate aggregate storage, but they do not show wh
 
 The 4 MiB limit applies to **one gRPC message**: the response of one plugin run on one cluster. So `P` and `C` do not matter here, only `N` (nodes per run) and `R` (relations per node). To keep the arithmetic easy we round 4 MiB to **4 x 10^6 B** (the real limit is 4,194,304 B, about 5% more).
 
-**Rules of thumb.** Protobuf adds a few bytes of tag and length to every field, so we count the text bytes and add a small fixed overhead:
+**Rules of thumb.** In the response, nodes and relations are described by text, and protobuf adds a few bytes of tag and length to every field. So we count the text bytes and add a small fixed overhead:
 
 ```text
-node     = kind + path + 10 B                      + node properties
-relation = kind + 2 x (kind + path) + 20 B         + relation properties
+node     = kind + path + 10 B                  + node properties
+relation = kind + 2 x (kind + path) + 20 B     + relation properties
 property = key + value + 5 B
 
-message  = N x node + N x R x relation
-         = N x (node + R x relation)
-
-max N    = 4 x 10^6 B / (node + R x relation)
+bytes per node, with its relations = node + R x relation
+response size = N x (node + R x relation)
+max N         = 4 x 10^6 B / (node + R x relation)
 ```
 
-Note that on the wire a relation carries the full `kind` and `path` of **both** ends, not UUIDs as in the database. This is why a relation is about twice as big as a node here.
+On the wire a relation carries the full `kind` and `path` of **both** ends, not UUIDs as in the database. Without properties this makes a relation about twice as big as a node.
 
-**Two example shapes** (typical `kind` = 20 B, `path` = 100 B):
+**Two example shapes** (`kind` = 20 B, `path` = 100 B):
 
-- **A:** no properties. node = 20 + 100 + 10 = **~130 B**, relation = 20 + 2 x 120 + 20 = **~280 B**.
-- **B:** the JSON budgets from [Bytes per row](#bytes-per-row): ~500 B of properties per node (10 properties, 12 B key + 35 B value) and ~150 B per relation (3 properties, 8 B key + 35 B value). node = 130 + 500 = **~630 B**, relation = 280 + 150 = **~430 B**.
+| Shape | Properties | node | relation |
+|---|---|---|---|
+| A | none | 20 + 100 + 10 = **130 B** | 20 + 2 x (20 + 100) + 20 = **280 B** |
+| B | the budgets from [Bytes per row](#bytes-per-row): 10 properties per node and 3 per relation, each with a 10 B key and a 35 B value (50 B per property) | 130 + 10 x 50 = **630 B** | 280 + 3 x 50 = **430 B** |
 
-**How many nodes fit in 4 x 10^6 B** (`max N = 4 x 10^6 / (node + R x relation)`):
+**How many nodes fit in 4 x 10^6 B.** For each `R`, first compute the bytes per node with its relations (`node + R x relation`), then divide the limit by it. For example, shape B with `R` = 10: 630 + 10 x 430 = 4,930 B per node, and 4 x 10^6 / 4,930 ≈ 8 x 10^2 nodes.
 
-| Shape | `R` = 0 | `R` = 1 | `R` = 10 | `R` = 100 |
-|---|---:|---:|---:|---:|
-| A | ~3 x 10^4 | ~10^4 | ~1.4 x 10^3 | ~1.4 x 10^2 |
-| B | ~6 x 10^3 | ~4 x 10^3 | ~8 x 10^2 | ~9 x 10^1 |
+| Shape | | `R` = 0 | `R` = 1 | `R` = 10 | `R` = 100 |
+|---|---|---:|---:|---:|---:|
+| A | bytes per node | 130 | 410 | 2,930 | 28,130 |
+| A | max `N` | ~3 x 10^4 | ~10^4 | ~1.4 x 10^3 | ~1.4 x 10^2 |
+| B | bytes per node | 630 | 1,060 | 4,930 | 43,630 |
+| B | max `N` | ~6 x 10^3 | ~4 x 10^3 | ~8 x 10^2 | ~9 x 10^1 |
 
 As soon as there are relations, they dominate.
 
-**The scenarios from [How many rows](#how-many-rows) against the limit.**
+**The scenarios against the limit.** Response size = `N` x bytes per node (from the table above). `P` and `C` do not matter for one run, so Today, Early game and Stretch (all with `N` = 10^3 and `R` = 10) give the same response size.
 
-| Shape | `N` | `R` | Calculation | Response size | Times the 4 x 10^6 B limit | Fits? |
-|---|---:|---:|---|---:|---:|---|
-| A | 10^3 | 10 | 10^3 x (130 + 10 x 280) = 10^3 x 2.9 x 10^3 | ~3 x 10^6 B | ~0.7x | yes |
-| B | 10^3 | 10 | 10^3 x (630 + 10 x 430) = 10^3 x 4.9 x 10^3 | ~5 x 10^6 B | ~1.2x | **no** |
-| A | 10^3 | 10^2 | 10^3 x (130 + 100 x 280) = 10^3 x 2.8 x 10^4 | ~3 x 10^7 B | ~7x | **no** |
-| B | 10^3 | 10^2 | 10^3 x (630 + 100 x 430) = 10^3 x 4.4 x 10^4 | ~4 x 10^7 B | ~11x | **no** |
-| A | 10^4 | 10 | 10^4 x (130 + 10 x 280) = 10^4 x 2.9 x 10^3 | ~3 x 10^7 B | ~7x | **no** |
-| B | 10^4 | 10 | 10^4 x (630 + 10 x 430) = 10^4 x 4.9 x 10^3 | ~5 x 10^7 B | ~12x | **no** |
+| Scenario | Shape | `N` | `R` | Bytes per node | Response size | Response / (4 x 10^6 B) | Fits? |
+|---|---|---:|---:|---:|---:|---:|---|
+| Today, Early game, Stretch | A | 10^3 | 10 | 2,930 | ~3 x 10^6 B | ~0.7 | yes |
+| Today, Early game, Stretch | B | 10^3 | 10 | 4,930 | ~5 x 10^6 B | ~1.2 | **no** |
+| Denser graph | A | 10^3 | 10^2 | 28,130 | ~3 x 10^7 B | ~7 | **no** |
+| Denser graph | B | 10^3 | 10^2 | 43,630 | ~4 x 10^7 B | ~11 | **no** |
+| 10k nodes + 10R | A | 10^4 | 10 | 2,930 | ~3 x 10^7 B | ~7 | **no** |
+| 10k nodes + 10R | B | 10^4 | 10 | 4,930 | ~5 x 10^7 B | ~12 | **no** |
 
 What we can read from this:
 
@@ -300,5 +303,3 @@ Max's feedback helps put their customers scale into context:
 - **Large-customer deployment scenarios.** Max described two possible scenarios:
   - With a few clusters, a customer may typically have around 1,000 deployments, with a maximum of approximately 10,000 deployments.
   - With around 200 clusters, a customer may typically have hundreds of deployments per cluster, with a maximum of approximately 1,000 deployments per cluster.
-
-- **Implication for the stretch scenario.** If the **Stretch (more clusters)** scenario uses `N = 10^4` instead of `N = 10^3`, its estimate increases by a factor of 10, from ~10^11 B (~100 GB) to ~10^12 B (~1 TB).
