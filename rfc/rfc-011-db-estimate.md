@@ -204,7 +204,7 @@ These limits discourage excessive output from a single plugin; they do **not** e
 Cap the serialized plugin response at an explicitly chosen size using gRPC message-size settings.
 
 - **Pros:** simple, rejects oversized responses before decoding; plugins can trade object count against payload size.
-- **Cons:** wire size is not database size. Synthetic snapshots applied through the [proposed schema](#proposed-schema) used **0.8x–8x** the response size after insertion and up to **12x** after one refresh. Short identifiers and empty properties amplify fixed row/index costs.
+- **Cons:** response size does not reliably predict database size. To compare them, synthetic plugin responses were generated with **5,000–20,000 nodes**, **1–20 relations per node**, and varying kind, paths lengths and properties payloads. Each response was measured in its serialized protobuf form, applied through the proposed schema, and compared with the PostgreSQL size of the resulting tables and indexes. Across these scenarios, the stored data occupied **about 1–10 times** the response size; the highest ratios occurred with short identifiers and empty properties, where fixed row and index overhead dominated.
 
 #### Option C: estimate storage before inserting and limit the estimate
 
@@ -222,15 +222,63 @@ Retain the existing **4 MiB** gRPC receive limit ([grpc-go default](https://gith
 
 ### What the selected limit could mean for storage
 
-At the largest ratio observed after one refresh, a full response would correspond to **4 MiB × 12 ≈ 50 MB** in the database per plugin–cluster pair. This is an illustrative high-end case from synthetic measurements.
+At the largest ratio observed after one refresh, a full response would correspond to **4 MiB × 10 ≈ 40 MB** in the database per plugin–cluster pair. This is an illustrative high-end case from synthetic measurements.
 
 If every plugin–cluster pair simultaneously reached that size:
 
-| Scenario | Plugin–cluster pairs (`P × C`) | Illustrative database size at ~50 MB per pair |
+| Scenario | Plugin–cluster pairs (`P × C`) | Illustrative database size at ~40 MB per pair |
 |---|---:|---:|
-| Today | 10 | ~0.5 GB |
-| Early game (including denser graph) | 1,000 | ~50 GB |
-| Stretch (more clusters) | 10,000 | ~500 GB |
+| Today | 10 | ~0.4 GB |
+| Early game (including denser graph) | 1,000 | ~40 GB |
+| Stretch (more clusters) | 10,000 | ~400 GB |
+
+### How big is a plugin response on the wire?
+
+The 4 MiB limit applies to **one gRPC message**: the response of one plugin run on one cluster. So `P` and `C` do not matter here, only `N` (nodes per run) and `R` (relations per node). To keep the arithmetic easy we round 4 MiB to **4 x 10^6 B** (the real limit is 4,194,304 B, about 5% more).
+
+**Rules of thumb.** Protobuf adds a few bytes of tag and length to every field, so we count the text bytes and add a small fixed overhead:
+
+```text
+node     = kind + path + 10 B                      + node properties
+relation = kind + 2 x (kind + path) + 20 B         + relation properties
+property = key + value + 5 B
+
+message  = N x node + N x R x relation
+         = N x (node + R x relation)
+
+max N    = 4 x 10^6 B / (node + R x relation)
+```
+
+Note that on the wire a relation carries the full `kind` and `path` of **both** ends, not UUIDs as in the database. This is why a relation is about twice as big as a node here.
+
+**Two example shapes** (typical `kind` = 20 B, `path` = 100 B):
+
+- **A:** no properties. node = 20 + 100 + 10 = **~130 B**, relation = 20 + 2 x 120 + 20 = **~280 B**.
+- **B:** the JSON budgets from [Bytes per row](#bytes-per-row): ~500 B of properties per node (10 properties, 12 B key + 35 B value) and ~150 B per relation (3 properties, 8 B key + 35 B value). node = 130 + 500 = **~630 B**, relation = 280 + 150 = **~430 B**.
+
+**How many nodes fit in 4 x 10^6 B** (`max N = 4 x 10^6 / (node + R x relation)`):
+
+| Shape | `R` = 0 | `R` = 1 | `R` = 10 | `R` = 100 |
+|---|---:|---:|---:|---:|
+| A | ~3 x 10^4 | ~10^4 | ~1.4 x 10^3 | ~1.4 x 10^2 |
+| B | ~6 x 10^3 | ~4 x 10^3 | ~8 x 10^2 | ~9 x 10^1 |
+
+As soon as there are relations, they dominate.
+
+**The scenarios from [How many rows](#how-many-rows) against the limit.**
+
+| Shape | `N` | `R` | Calculation | Response size | Times the 4 x 10^6 B limit | Fits? |
+|---|---:|---:|---|---:|---:|---|
+| A | 10^3 | 10 | 10^3 x (130 + 10 x 280) = 10^3 x 2.9 x 10^3 | ~3 x 10^6 B | ~0.7x | yes |
+| B | 10^3 | 10 | 10^3 x (630 + 10 x 430) = 10^3 x 4.9 x 10^3 | ~5 x 10^6 B | ~1.2x | **no** |
+| A | 10^3 | 10^2 | 10^3 x (130 + 100 x 280) = 10^3 x 2.8 x 10^4 | ~3 x 10^7 B | ~7x | **no** |
+| B | 10^3 | 10^2 | 10^3 x (630 + 100 x 430) = 10^3 x 4.4 x 10^4 | ~4 x 10^7 B | ~11x | **no** |
+| A | 10^4 | 10 | 10^4 x (130 + 10 x 280) = 10^4 x 2.9 x 10^3 | ~3 x 10^7 B | ~7x | **no** |
+| B | 10^4 | 10 | 10^4 x (630 + 10 x 430) = 10^4 x 4.9 x 10^3 | ~5 x 10^7 B | ~12x | **no** |
+
+What we can read from this:
+
+The 4 MiB limit does **not** cover the larger scenarios. To cover them we will need to raise the limit.
 
 
 ## Answers to the review questions
@@ -242,10 +290,6 @@ Questions from [@akavel-reply's comment](https://github.com/naira-project/naira/
 - **How long a `kind` and a `path` do we allow?** 40 B and 300 B. See [Proposed limits](#proposed-limits).
 - **How many nodes can a plugin emit, how much space do we allow per JSON `properties` blob, and how many relations do we allow?** We do not try to calculate exact values for these. One limit on the whole response of a plugin run (10 MB) bounds all of them together, see [Why 10 MB](#why-10-mb).
 - **What if a single plugin needs more than the limit?** The limit can be configured per plugin, so a plugin that needs more can get an explicitly higher one.
-
-## Notes
-
-- **Plugin sizes in other tools.** OpenMetadata can produce a significant number of nodes. Its public benchmark was done with 10,000, 100,000 and 1.8M entities, representing a small, medium and large organization ([benchmark](https://blog.open-metadata.org/openmetadata-benchmarking-3120782f8a12)). I do not know if this is representative for us. Max what do you think? Models, MCP servers and deployments look like more limited sets of data.
 
 ## Notes from Max
 
