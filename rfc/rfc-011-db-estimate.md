@@ -244,9 +244,9 @@ node     = kind + path + 10 B                  + node properties
 relation = kind + 2 x (kind + path) + 20 B     + relation properties
 property = key + value + 5 B
 
-bytes per node, with its relations = node + R x relation
-response size = N x (node + R x relation)
-max N         = 4 x 10^6 B / (node + R x relation)
+bytes per node = node + R x relation
+response size  = N x bytes per node
+max N          = (4 x 10^6 B) / bytes per node
 ```
 
 On the wire a relation carries the full `kind` and `path` of **both** ends, not UUIDs as in the database. Without properties this makes a relation about twice as big as a node.
@@ -258,7 +258,7 @@ On the wire a relation carries the full `kind` and `path` of **both** ends, not 
 | A | none | 20 + 100 + 10 = **130 B** | 20 + 2 x (20 + 100) + 20 = **280 B** |
 | B | the budgets from [Bytes per row](#bytes-per-row): 10 properties per node and 3 per relation, each with a 10 B key and a 35 B value (50 B per property) | 130 + 10 x 50 = **630 B** | 280 + 3 x 50 = **430 B** |
 
-**How many nodes fit in 4 x 10^6 B.** For each `R`, first compute the bytes per node with its relations (`node + R x relation`), then divide the limit by it. For example, shape B with `R` = 10: 630 + 10 x 430 = 4,930 B per node, and 4 x 10^6 / 4,930 ≈ 8 x 10^2 nodes.
+**Maximum nodes that fit in 4 x 10^6 B.** For shape B with `R` = 10, the bytes per node are `630 + 10 x 430 = 4,930 B`. Substituting this into the `max N` formula above gives `4 x 10^6 B / 4,930 B ≈ 8 x 10^2` nodes.
 
 | Shape | | `R` = 0 | `R` = 1 | `R` = 10 | `R` = 100 |
 |---|---|---:|---:|---:|---:|
