@@ -100,10 +100,10 @@ Only arithmetic, not measurement.
 
 | Table | Table row | Indexes | Total |
 |---|---|---|---|
-| `nodes` | 16 + 20 + 100 + 30 ≈ 170 | PK: 16 + 20 ≈ 40; unique (`kind`, `path`): 20 + 100 + 20 ≈ 140 | ≈ 350 |
-| `node_plugin_claims` | 16 + 20 + 16 + 30 ≈ 80, plus JSON | PK: 16 + 20 + 20 ≈ 60 | ≈ 140 + JSON |
-| `relations` | 16 + 20 + 16 + 16 + 30 ≈ 100 | PK: 16 + 20 ≈ 40; unique (`kind`, `from`, `to`): 20 + 16 + 16 + 20 ≈ 70 | ≈ 210 |
-| `relation_plugin_claims` | 16 + 20 + 16 + 30 ≈ 80, plus JSON | PK: 16 + 20 + 20 ≈ 60 | ≈ 140 + JSON |
+| `nodes` | `id` UUID (16) + `kind` (20) + `path` (100) + row overhead (30) ≈ 170 B | PK: `id` UUID (16) + index overhead (20) ≈ 40 B; unique: `kind` (20) + `path` (100) + index overhead (20) = 140 B | 170 (row) + 40 (PK) + 140 (unique) ≈ 350 B |
+| `node_plugin_claims` | `node_id` UUID (16) + `plugin_name` (20) + `snapshot_id` UUID (16) + row overhead (30) ≈ 80 B, plus JSON | PK: `node_id` UUID (16) + `plugin_name` (20) + index overhead (20) ≈ 60 B | 80 (row) + 60 (PK) ≈ 140 B, plus JSON |
+| `relations` | `id` UUID (16) + `kind` (20) + `from_node_id` UUID (16) + `to_node_id` UUID (16) + row overhead (30) ≈ 100 B | PK: `id` UUID (16) + index overhead (20) ≈ 40 B; unique: `kind` (20) + each node UUID (16 + 16) + index overhead (20) ≈ 70 B | 100 (row) + 40 (PK) + 70 (unique) ≈ 210 B |
+| `relation_plugin_claims` | `relation_id` UUID (16) + `plugin_name` (20) + `snapshot_id` UUID (16) + row overhead (30) ≈ 80 B, plus JSON | PK: `relation_id` UUID (16) + `plugin_name` (20) + index overhead (20) ≈ 60 B | 80 (row) + 60 (PK) ≈ 140 B, plus JSON |
 
 **Why count claims together with nodes and relations.** In reality, different plugins report overlapping data, so there are fewer `nodes` and `relations` rows than claims. In the extreme case, the number of `nodes` rows equals the number of claims. To stay on the safe side, we add the sizes of the two tables and treat them as one row: a node row and a relation row. This is an upper bound with respect to overlap.
 
