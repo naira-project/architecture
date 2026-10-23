@@ -59,6 +59,13 @@ We will implement **Model D**, supporting both **Model A (central collection)** 
 
 Both models must use the **same collection process and Naira catalog**. The data should have the same format and meaning, no matter where the plugin runs.
 
+From _technical_ point of view, we will fully support both A and C models. However, from "marketing" and deployment/PlatEng point of view, we will "officially" support and recommend only one specific configuration/setup:
+
+- plugins which need access to k8s API will be deployed on remote clusters (model C);
+- plugins that don't need access to k8s API will be deployed on the central cluster (model A).
+
+This simplifies and streamlines deployment for PlatEngs using/administering Naira, as well as simplifies and focuses our (core team's) testing and documentation. We can clearly describe which plugins "should" live on which side, and provide preconfigured bundles for deploying an agent with a default set of plugins, and a catalog with its default set of plugins.
+
 ![Target architecture: central and remote plugin execution](assets/adr-012-diagram.png)
 
 ### Shared Principles
