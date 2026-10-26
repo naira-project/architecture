@@ -39,7 +39,7 @@ Counting a node together with its claim is a simplification, explained in [Bytes
 | node row | `nodes` + `node_plugin_claims` | 10^3 |
 | relation row | `relations` + `relation_plugin_claims` | 5 x 10^2 |
 
-Row sizes include indexes and leave room for the JSON `properties` of the claim (≈ 500 B per node and ≈ 150 B per relation). This is the **baseline**. It covers the typical claims of plugins (see [Plugin properties](#plugin-properties)), and it is meant as a high scenario for them.
+Row sizes include indexes and leave room for the JSON `properties` of the claim (≈ 500 B per node and ≈ 150 B per relation). This is the **baseline**. It covers the typical claims of plugins (see [Plugin properties](#plugin-properties)), and it is meant as a high scenario for them. Concrete synthetic JSON examples at the baseline, JSON x3 and JSON x9 sizes are provided in [Appendix A](rfc-011-appendix-example-json/rfc-011-example-json.md).
 
 To see what happens when plugins send more data, the scenarios also use three bigger variants. Only the JSON grows; the fixed part (identifiers, row overhead, indexes) stays the same, ≈ 500 B per node and ≈ 350 B per relation:
 
@@ -393,3 +393,7 @@ Max's feedback helps put their customers scale into context:
 - **Large-customer deployment scenarios.** Max described two possible scenarios:
   - With a few clusters, a customer may typically have around 1,000 deployments, with a maximum of approximately 10,000 deployments.
   - With around 200 clusters, a customer may typically have hundreds of deployments per cluster, with a maximum of approximately 1,000 deployments per cluster.
+
+## Appendix
+
+- [Appendix A: Example JSON `properties`](rfc-011-appendix-example-json/rfc-011-example-json.md) — synthetic claim payload examples and their byte-size breakdowns, with JSON fixtures. These illustrate the baseline, JSON x3 and JSON x9 estimates; JSON x50 is omitted as a boundary case.

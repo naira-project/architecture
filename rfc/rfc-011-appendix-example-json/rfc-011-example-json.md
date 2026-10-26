@@ -17,7 +17,7 @@ Each example is stored as a JSON fixture alongside this document. Fixtures end w
 
 JSON x50 is omitted because it represents only a boundary-case estimate.
 
-### Example JSON size. 
+### Example JSON size 
 For a flat object, count each property and the JSON punctuation separately:
 
 ```text
