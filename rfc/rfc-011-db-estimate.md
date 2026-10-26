@@ -8,7 +8,7 @@
 | Scope | First deployment and early scaling. This is not a long-term or hyperscale estimate. |
 | Origin | Inspired by [@akavel-reply's comment](https://github.com/naira-project/naira/pull/247#discussion_r4249078169) requesting a database size estimation. |
 
-Final estimates are rounded to powers of 10. They show orders of magnitude, not precise values.
+Final estimates are rounded **up** to one significant digit (for example 4.7 x 10^7 becomes 5 x 10^7), so they stay on the safe side. They show orders of magnitude, not precise values.
 
 ## Goal
 
@@ -39,7 +39,23 @@ Counting a node together with its claim is a simplification, explained in [Bytes
 | node row | `nodes` + `node_plugin_claims` | 10^3 |
 | relation row | `relations` + `relation_plugin_claims` | 5 x 10^2 |
 
-Row sizes include indexes and leave room for the JSON `properties` of the claim. They are calculated from the proposed schema:
+Row sizes include indexes and leave room for the JSON `properties` of the claim (≈ 500 B per node and ≈ 150 B per relation). This is the **baseline**. It covers the typical claims of plugins (see [Plugin properties](#plugin-properties)), and it is meant as a high scenario for them.
+
+To see what happens when plugins send more data, the scenarios also use three bigger variants. Only the JSON grows; the fixed part (identifiers, row overhead, indexes) stays the same, ≈ 500 B per node and ≈ 350 B per relation:
+
+```text
+node row     = 500 B + JSON per node          (rounded up)
+relation row = 350 B + JSON per relation      (rounded up)
+```
+
+| Variant | JSON per node | JSON per relation | Node row | Relation row |
+|---|---|---|---|---|
+| **Baseline** | 5 x 10^2 B | 1.5 x 10^2 B | 10^3 B | 5 x 10^2 B |
+| **JSON x3** | 1.5 x 10^3 B | 4.5 x 10^2 B | 2 x 10^3 B (500 + 1,500) | 10^3 B (350 + 450 = 800) |
+| **JSON x9** | 4.5 x 10^3 B | 1.35 x 10^3 B | 5 x 10^3 B (500 + 4,500) | 2 x 10^3 B (350 + 1,350 = 1,700) |
+| **JSON x50** | 2.5 x 10^4 B | 7.5 x 10^3 B | 3 x 10^4 B (500 + 25,000 = 25,500) | 8 x 10^3 B (350 + 7,500 = 7,850) |
+
+The row sizes are calculated from the proposed schema:
 
 <a id="proposed-schema"></a>
 <details>
@@ -117,12 +133,51 @@ At the schema caps (`kind` 40 B, `plugin_name` 40 B), both the relation and its 
 
 </details>
 
+<a id="plugin-properties"></a>
+
+<details>
+<summary>Plugin properties</summary>
+
+Code-based inventory from 2026.10.23 of the properties emitted by each current plugin. Byte estimates use compact UTF-8 JSON and are rough planning examples, not limits. A useful approximation for a properties object is:
+
+```text
+JSON bytes ≈ 2 + Σ(key bytes + value bytes + 5) + (property count - 1)
+```
+
+The `5` accounts for quotes around the key and string value plus the colon; the `2` is `{}` and commas separate properties. Most keys are about **8–22 B**. Typical short values (names, statuses, IDs, counts) are about **5–40 B**; URLs often **40–100 B**. Descriptions, schemas, and serialized metadata can be hundreds of bytes to multiple KiB. Non-ASCII text and JSON escaping can increase byte size.
+
+| Plugin | Node properties | Relation properties | Representative JSON size / notes |
+|---|---|---|---|
+| `bedrock` | Model: usually 5. Inference endpoint: roughly 4–10. | `serves_model`: 0. | Model properties are short names, modalities and provider. Endpoint values are region/model identifiers, status and optional numeric usage. Typically a few hundred bytes per node. |
+| `depl_calls_svc` | Deployment and Service nodes: 0. | `calls`: 1 (`env`, the matching environment-variable name). | Usually a few dozen bytes per relation. |
+| `depl_uses_litellm` | Deployment and model nodes: 0. | `uses_model`: 0. | Empty properties objects. |
+| `depl_uses_thalamus` | Deployment and model nodes: 0. | `uses_model`: 0. | Empty properties objects. |
+| `fluxcd` | Flux GitRepository and external repository nodes: 1 (`url`). Other emitted nodes: 0. | All relation kinds: 0. | A repository URL is commonly ~40–100 B; JSON properties around ~55–115 B for that one property. Repository nodes are a small subset of the graph. |
+| `argocd` | Application: 6–10 properties (project/status/destination/source type, operation flag, and optional deploy/operation timestamps). Git repository: 1 (`url`). Managed resource: 0. | `describes`: 0. `sourced_from` and `deployed_from`: 0–1 (`paths`, a JSON-encoded list of source paths). | Application JSON is typically a few hundred bytes. The relation `paths` value grows with source paths and has no plugin-side cap; one short path adds roughly 15–30 B plus commas/quotes. |
+| `github` | Repository: 1–3 (`url`, optional `language`, `homepage`). Deployment and owner: 0. | `built_from`, `owned_by`: 0. | Repository properties typically ~100–250 B, largely determined by URL/homepage length. |
+| `litellm` | Model: 1 (`owned_by`). Inference endpoint: typically ~7–15 (up to 15 optional/conditional fields in the current mapper). MCP server/tool: variable; see note. | `serves_model`, `exposes`: 0. App `uses_model`: 1 (`litellm_virtual_key`). | Model: ~25–60 B. Endpoint: typically ~0.4–1.0 KiB for short scalar values. App edge includes the virtual key, whose length is externally controlled. MCP tool schemas/descriptions can be much larger and are not universally size-capped. |
+| `mcp_servers` | Server: typically ~3–14. Tool: 0–9. | `exposes`: 0. | Server metadata is usually hundreds of bytes or less. Tool descriptions are clipped to 2,000 Unicode code points, but input/output schemas have no explicit size cap and may be KiB-sized. |
+| `mlflow` | Model: 1 (`description`). Dataset: 2 (`digest`, `source_type`). | `trained_on`: 1 (`run_id`). | Dataset and relation properties are usually ~50–150 B. Model JSON size depends on description; there is no plugin-side clipping. |
+| `openai_api_models` | Model: provider-dependent; zero or more properties. Extra `/v1/models` fields are retained, with nested object keys flattened. | None. | No representative fixed property count: provider response controls both count and content. A model can have KiB of properties, e.g. nested metadata or arrays. No plugin-side size cap. |
+| `openmetadata` | Dataset/table: 4 base properties, typically 4–9 total (description, FQN, URL, optional types/tags/owners/columns). | `derived_from`: 0. | Often a few hundred bytes, but serialized columns can make properties KiB-sized. Text and columns are not clipped. |
+| `tech_radar` | Radar: 8. Entry: 8. | None. | Entry is typically a few hundred bytes, with rationale capped at 2,000 code points.|
+| `thalamus` | CRD model: typically 8–12. API model fallback: 1 (`owned_by`). Optional Hugging Face repository: 0. | `sourced_from`: 0. | Most CRD values are short, but serialized `engine_args` and `node_selector` can make the properties hundreds of bytes or more; neither is clipped. |
+
+**What this means for the row budgets:**
+
+- Most claims are small: Deployment and Service nodes and most relations have empty properties, and repositories and datasets are ~50–250 B. The baseline (≈ 500 B per node, ≈ 150 B per relation) covers these.
+- Some node kinds are medium, a few hundred bytes to ~1 KiB: ArgoCD application, LiteLLM inference endpoint, `thalamus` CRD model, `tech_radar` entry, MCP server, Bedrock endpoint. They are between baseline budget and JSON x3.
+- Some properties are **unbounded** (no plugin-side clipping) and can reach KiB: MCP tool schemas, `openai_api_models` metadata, `openmetadata` columns, `mlflow` model description, `thalamus` `engine_args` / `node_selector`. These are the claims that go beyond the baseline. The **JSON x3**, **JSON x9** and **JSON x50** variants show what happens if such claims become common. **JSON x50** (≈ 25 KB per node, ≈ 7.5 KB per relation) is an extreme what-if, far above anything in the inventory above, meant to show the upper end of the range.
+
+</details>
+
 ### Assumptions
 
 1. The estimate covers **current graph state only** (`nodes`, `node_plugin_claims`, `relations`, `relation_plugin_claims`). Snapshot application replaces a plugin's previous claims and removes nodes and relations that no plugin claims anymore, so old snapshots are not stored. If we decide to keep them, the numbers below are multiplied by the number of retained snapshots.
 2. The `operations` table is **not** included. It grows with run history, not with graph size.
 3. If plugins report the same object, there are fewer rows in `nodes` and `relations`. We ignore this (see [Bytes per row rationale](#bytes-per-row-rationale)).
 4. The row sizes from [Bytes per row](#bytes-per-row) are budgets for typical identifiers: they include ≈ 500 B of JSON per node and ≈ 150 B per relation, but only ≈ 30 B and ≈ 70 B when identifiers are at their caps.
+5. The **JSON x3**, **JSON x9** and **JSON x50** variants multiply only the JSON part of the baseline (500 -> 1,500 -> 4,500 -> 25,000 B per node, 150 -> 450 -> 1,350 -> 7,500 B per relation). They are what-if variants.
 6. All scenarios describe one catalog database that holds data from all `C` clusters.
 
 ### How many rows
@@ -141,6 +196,8 @@ Each of the `P` plugins runs on each of the `C` clusters and emits `N` nodes, ea
 - node rows = `P x C x N`
 - relation rows = `P x C x N x R`
 
+<a id="where-numbers-come"></a>
+
 #### Where the numbers come from
 
 - **`P` (plugins).** We have about 10 plugins today. Backstage has 258 active plugins. In practice a customer doesn't use every tool in a market per cluster (IIRC Max was saying one time that customers are usually happy with 3 or 4 specific plugins to their needs), so 100 plugins per cluster is a safe margin. We use `P = 10^2` as the maximum for this discussion.
@@ -150,29 +207,56 @@ Each of the `P` plugins runs on each of the `C` clusters and emits `N` nodes, ea
 
 ### Scenarios
 
-Database size = node rows x 10^3 B + relation rows x 5 x 10^2 B, rounded to a power of 10. The row sizes come from [Bytes per row](#bytes-per-row); the calculation is shown below the table.
+Database size = node rows x node row bytes + relation rows x relation row bytes, rounded up. The row sizes for the four variants come from [Bytes per row](#bytes-per-row); the calculation is shown below the table.
 
-| Scenario | `P` | `C` | `N` | `R` | Node rows `P x C x N` | Relation rows `P x C x N x R` | Database size |
-|---|---|---|---|---|---|---|---|
-| Today | 10^1 | 1 | 10^3 | 10^1 | 10^4 | 10^5 | ~10^8 B |
-| Early game | 10^2 | 10^1 | 10^3 | 10^1 | 10^6 | 10^7 | ~10^10 B |
-| Stretch (more clusters) | 10^2 | 10^2 | 10^3 | 10^1 | 10^7 | 10^8 | ~10^11 B |
-| Early game, denser graph | 10^2 | 10^1 | 10^3 | 10^2 | 10^6 | 10^8 | ~10^11 B |
+| Scenario | `P` | `C` | `N` | `R` | Node rows `P x C x N` | Relation rows `P x C x N x R` | Baseline | JSON x3 | JSON x9 | JSON x50 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Today | 10^1 | 1 | 10^3 | 10^1 | 10^4 | 10^5 | 6 x 10^7 B | 2 x 10^8 B | 3 x 10^8 B | 2 x 10^9 B |
+| Early game | 10^2 | 10^1 | 10^3 | 10^1 | 10^6 | 10^7 | 6 x 10^9 B | 2 x 10^10 B | 3 x 10^10 B | 2 x 10^11 B |
+| Stretch (more clusters) | 10^2 | 10^2 | 10^3 | 10^1 | 10^7 | 10^8 | 6 x 10^10 B | 2 x 10^11 B | 3 x 10^11 B | 2 x 10^12 B |
+| Early game, denser graph | 10^2 | 10^1 | 10^3 | 10^2 | 10^6 | 10^8 | 6 x 10^10 B | 2 x 10^11 B | 3 x 10^11 B | 9 x 10^11 B |
 
 #### How the numbers are calculated
 
 ```text
-node_bytes     = (P x C x N)     x 10^3 B
-relation_bytes = (P x C x N x R) x 5 x 10^2 B
-size           = node_bytes + relation_bytes, rounded to the nearest power of 10
+size = node rows x node row bytes + relation rows x relation row bytes
 ```
 
-| Scenario | `node_bytes` | `relation_bytes` | Sum | Rounded |
-|---|---|---|---|---|
-| Today | 10^4 x 10^3 = 10^7 | 10^5 x 5 x 10^2 = 5 x 10^7 | 6 x 10^7 B | **~10^8 B** |
-| Early game | 10^6 x 10^3 = 10^9 | 10^7 x 5 x 10^2 = 5 x 10^9 | 6 x 10^9 B | **~10^10 B** |
-| Stretch | 10^7 x 10^3 = 10^10 | 10^8 x 5 x 10^2 = 5 x 10^10 | 6 x 10^10 B | **~10^11 B** |
-| Denser graph | 10^6 x 10^3 = 10^9 | 10^8 x 5 x 10^2 = 5 x 10^10 | 5 x 10^10 B | **~10^11 B** |
+**Baseline** (node row 10^3 B, relation row 5 x 10^2 B):
+
+| Scenario | Node rows | `node_bytes` | Relation rows | `relation_bytes` | Sum | Rounded up |
+|---|---|---|---|---|---|---|
+| Today | 10^4 | 10^4 x 10^3 = 10^7 | 10^5 | 10^5 x 5 x 10^2 = 5 x 10^7 | 6 x 10^7 B | **6 x 10^7 B** |
+| Early game | 10^6 | 10^6 x 10^3 = 10^9 | 10^7 | 10^7 x 5 x 10^2 = 5 x 10^9 | 6 x 10^9 B | **6 x 10^9 B** |
+| Stretch | 10^7 | 10^7 x 10^3 = 10^10 | 10^8 | 10^8 x 5 x 10^2 = 5 x 10^10 | 6 x 10^10 B | **6 x 10^10 B** |
+| Denser graph | 10^6 | 10^6 x 10^3 = 10^9 | 10^8 | 10^8 x 5 x 10^2 = 5 x 10^10 | 5.1 x 10^10 B | **6 x 10^10 B** |
+
+**JSON x3** (node row 2 x 10^3 B, relation row 10^3 B):
+
+| Scenario | Node rows | `node_bytes` | Relation rows | `relation_bytes` | Sum | Rounded up |
+|---|---|---|---|---|---|---|
+| Today | 10^4 | 10^4 x 2 x 10^3 = 2 x 10^7 | 10^5 | 10^5 x 10^3 = 10^8 | 1.2 x 10^8 B | **2 x 10^8 B** |
+| Early game | 10^6 | 10^6 x 2 x 10^3 = 2 x 10^9 | 10^7 | 10^7 x 10^3 = 10^10 | 1.2 x 10^10 B | **2 x 10^10 B** |
+| Stretch | 10^7 | 10^7 x 2 x 10^3 = 2 x 10^10 | 10^8 | 10^8 x 10^3 = 10^11 | 1.2 x 10^11 B | **2 x 10^11 B** |
+| Denser graph | 10^6 | 10^6 x 2 x 10^3 = 2 x 10^9 | 10^8 | 10^8 x 10^3 = 10^11 | 1.02 x 10^11 B | **2 x 10^11 B** |
+
+**JSON x9** (node row 5 x 10^3 B, relation row 2 x 10^3 B):
+
+| Scenario | Node rows | `node_bytes` | Relation rows | `relation_bytes` | Sum | Rounded up |
+|---|---|---|---|---|---|---|
+| Today | 10^4 | 10^4 x 5 x 10^3 = 5 x 10^7 | 10^5 | 10^5 x 2 x 10^3 = 2 x 10^8 | 2.5 x 10^8 B | **3 x 10^8 B** |
+| Early game | 10^6 | 10^6 x 5 x 10^3 = 5 x 10^9 | 10^7 | 10^7 x 2 x 10^3 = 2 x 10^10 | 2.5 x 10^10 B | **3 x 10^10 B** |
+| Stretch | 10^7 | 10^7 x 5 x 10^3 = 5 x 10^10 | 10^8 | 10^8 x 2 x 10^3 = 2 x 10^11 | 2.5 x 10^11 B | **3 x 10^11 B** |
+| Denser graph | 10^6 | 10^6 x 5 x 10^3 = 5 x 10^9 | 10^8 | 10^8 x 2 x 10^3 = 2 x 10^11 | 2 x 10^11 B | **3 x 10^11 B** |
+
+**JSON x50** (node row 3 x 10^4 B, relation row 8 x 10^3 B):
+
+| Scenario | Node rows | `node_bytes` | Relation rows | `relation_bytes` | Sum | Rounded up |
+|---|---|---|---|---|---|---|
+| Today | 10^4 | 10^4 x 3 x 10^4 = 3 x 10^8 | 10^5 | 10^5 x 8 x 10^3 = 8 x 10^8 | 1.1 x 10^9 B | **2 x 10^9 B** |
+| Early game | 10^6 | 10^6 x 3 x 10^4 = 3 x 10^10 | 10^7 | 10^7 x 8 x 10^3 = 8 x 10^10 | 1.1 x 10^11 B | **2 x 10^11 B** |
+| Stretch | 10^7 | 10^7 x 3 x 10^4 = 3 x 10^11 | 10^8 | 10^8 x 8 x 10^3 = 8 x 10^11 | 1.1 x 10^12 B | **2 x 10^12 B** |
+| Denser graph | 10^6 | 10^6 x 3 x 10^4 = 3 x 10^10 | 10^8 | 10^8 x 8 x 10^3 = 8 x 10^11 | 8.3 x 10^11 B | **9 x 10^11 B** |
 
 Stretch is the early game scenario with 10 times more clusters, so everything is 10 times larger. In the denser graph only `R` changed compared to the early game, and the relation rows now dominate.
 
@@ -181,6 +265,7 @@ Stretch is the early game scenario with 10 times more clusters, so everything is
 - Size grows **linearly** with `P`, `C` and `N`. Ten times more clusters means ten times more storage.
 - **Relations per node (`R`)** matters a lot. Relation rows (relations and their claims) are the most numerous, so they are the largest part of the database. A denser graph costs about as much as ten times more clusters.
 - **The size of the plugin JSON** is another major factor. The data in `node_plugin_claims` heavily impacts storage, and the JSON payload in `relation_plugin_claims` can increase the database size even faster, because there can be many more relation claims than node claims.
+- Three times more JSON gives about 2 times more database, nine times more JSON about 4 times, fifty times more JSON about 20 times
 
 ## Plugin output limits
 
@@ -192,36 +277,36 @@ These limits discourage excessive output from a single plugin; they do **not** e
 |---|---|---|
 | `kind` length | 40 B | The longest kind today has 21 characters. Plugin authors control this string. |
 | `path` length | 300 B | The longest path today is a GitHub repo id (~100 characters) plus a prefix (~10). Leave headroom for identifiers from other source systems. |
-| Plugin run response (one plugin, one cluster) | 4 MiB | Retain the existing gRPC receive limit; no additional storage budget (option B). |
+| Plugin run response (one plugin, one cluster) | 4 MiB (current) | This is the gRPC receive limit we have today, not a target value. We keep it for now and expect to raise it later (option B). |
 
 Hitting limits reject the whole snapshot and keep the last successful one.
 
 ### Plugin run size: options
 
-**Proposal:** for now, the only limit on the size of a plugin run is the gRPC message size limit (option B). It does not guarantee the size in the database, and we accept that for the early game.
+**Proposal:** for now, we do not add a limit of our own on the size of a plugin run. The only limit is the gRPC message size limit that we already have (option B), which is 4 MiB. We do not treat 4 MiB as a value to aim for: it is the current default, and we expect to raise it, or to support chunked responses, once real plugin runs need more (see [Implications for the 4 MiB limit](#implications-for-the-4-mib-limit)). This limit does not guarantee the size in the database.
 
 #### Option A: Limit parts (JSON per claim, nodes per run, relations per node)
 
 - **Pros:** simple checks; catches specific problems such as one huge JSON blob.
 - **Cons:** rigid trade-offs. Small JSON limits suit many small relations but block a few rich ones; count limits do the reverse.
 
-#### Option B: Limit response size with the gRPC message limit (proposed)
+#### Option B: Limit response size with the gRPC message limit (proposed for now)
 
-The catalog rejects any plugin response bigger than the gRPC receive limit. The default is **4 MiB** ([grpc-go default](https://github.com/grpc/grpc-go/blob/679b224109d3373eb0e4d80b6e41aafc8d295b6d/server.go#L448)). If a plugin needs more, we can raise the limit (a configuration value, possibly per plugin) or send the response in chunks.
+Today the catalog rejects any plugin response bigger than the gRPC receive limit, which is at the default of **4 MiB** ([grpc-go default](https://github.com/grpc/grpc-go/blob/679b224109d3373eb0e4d80b6e41aafc8d295b6d/server.go#L448)). This is the limit we currently have, not a size we have chosen as right for plugins. When plugins need more, we will have to raise it (a configuration value, possibly per plugin) or send the response in chunks.
 
 - **Pros:** nothing new to implement or calibrate; oversized responses are rejected before decoding; plugin authors can freely trade the number of objects against the size of the payload.
 - **Cons:** response size does not reliably predict database size. To compare them, we generated synthetic plugin responses with **5,000–20,000 nodes**, **1–20 relations per node** and varying sizes of kinds, paths and properties. We measured each response in its serialized protobuf form, applied it through the proposed schema, and compared it with the PostgreSQL size of the resulting tables and indexes. The database was ~**1–10 times** the response size after insertion. The highest ratios occur with short identifiers and empty properties, where the fixed row and index overhead dominates. Extrapolating these ratios, a 4 MiB response may need roughly 4–40 MB in the database. So the scenario estimates in this RFC are planning numbers, not guarantees.
 
 #### Option C: Estimate storage before inserting and limit the estimate
 
-After decoding the response and before writing to the database, add up a charge per object and reject the snapshot above a threshold, for example 10 MB. A candidate rule is **400 B per object + 2 x its text bytes** (kind, path where present, plugin name and properties).
+After decoding the response and before writing to the database, add up a charge per object and reject the snapshot above a threshold, for example 10 MB. A possible rule is **400 B per object + 2 x its text bytes** (kind, path where present, plugin name and properties. The charge value 400B is illustrative only; if we decide to pursue this approach, it will need to be calculated).
 
 - **Pros:** closer to the real storage size than the wire size.
 - **Cons:** extra accounting and maintenance. The fixed values must be revisited after schema or index changes, and validated against real data before we can rely on them.
 
-### Potential storage impact of the selected limit
+### Potential storage impact of the current limit
 
-At the largest ratio observed after one refresh, a full response would correspond to **4 MiB × 10 ≈ 40 MB** in the database per plugin–cluster pair. This is an illustrative high-end case from synthetic measurements.
+At the largest ratio observed in Option B, a full response would correspond to **4 MiB × 10 ≈ 40 MB** in the database per plugin–cluster pair. This is an illustrative high-end case from synthetic measurements. If the limit is raised in the future, these numbers grow in the same proportion.
 
 If every plugin–cluster pair simultaneously reached that size:
 
@@ -233,7 +318,7 @@ If every plugin–cluster pair simultaneously reached that size:
 
 ### Plugin response size on the wire
 
-The database scenarios above estimate aggregate storage, but they do not show whether one plugin run fits within the current **4 MiB** gRPC message limit. This section estimates response sizes for representative node and relation counts, compares them with that limit, and shows which scenarios may require a higher limit or support for chunked responses.
+The database scenarios in [scenarios](#scenarios) estimate aggregate storage, but they do not show whether one plugin run fits within the current **4 MiB** gRPC message limit. This section estimates response sizes for representative node and relation counts, compares them with that limit, and shows which scenarios may require a higher limit or support for chunked responses.
 
 The 4 MiB limit applies to **one gRPC message**: the response of one plugin run on one cluster. So `P` and `C` do not matter here, only `N` (nodes per run) and `R` (relations per node). To keep the arithmetic easy we round 4 MiB to **4 x 10^6 B** (the real limit is 4,194,304 B, about 5% more).
 
@@ -251,7 +336,7 @@ max N          = (4 x 10^6 B) / bytes per node
 
 On the wire a relation carries the full `kind` and `path` of **both** ends, not UUIDs as in the database. Without properties this makes a relation about twice as big as a node.
 
-**Two example shapes** (`kind` = 20 B, `path` = 100 B):
+**Example shapes** (`kind` = 20 B, `path` = 100 B):
 
 | Shape | Properties | node | relation |
 |---|---|---|---|
@@ -282,7 +367,7 @@ As soon as there are relations, they dominate.
 
 #### Implications for the 4 MiB limit
 
-The 4 MiB limit does **not** cover the larger per-run scenarios shown above. If plugins need to send responses of those sizes, we will need to raise the limit or support chunked responses.
+4 MiB is the limit we have today, and it does **not** cover the larger per-run scenarios shown above. Already shape B with `N` = 10^3 and `R` = 10 is above it, and the denser graph is about 10 times above it. So at some point the limit will have to be raised, or chunked responses supported, before plugins can send responses of those sizes.
 
 ## Additional context
 
@@ -293,8 +378,7 @@ Questions from [@akavel-reply's comment](https://github.com/naira-project/naira/
 - **How many plugins might we have?** At most about 100 (`P = 10^2`), and typically around 25 per cluster. See [Where the numbers come from](#where-numbers-come).
 - **How many kinds of nodes could a plugin emit?** This is not needed for the estimate, only the number of nodes matters. We do not propose a limit.
 - **How long a `kind` and a `path` do we allow?** 40 B and 300 B. See [Proposed limits](#proposed-limits).
-- **How many nodes can a plugin emit, how much space do we allow per JSON `properties` blob, and how many relations do we allow?** We do not set separate limits for these. The current **4 MiB** gRPC message limit bounds the complete response from one plugin run; see [Proposed limits](#proposed-limits) and [How big is a plugin response on the wire?](#how-big-is-a-plugin-response-on-the-wire).
-- **What if a single plugin needs more than the limit?** We can raise the limit, potentially per plugin, or support chunked responses.
+- **How many nodes can a plugin emit, how much space do we allow per JSON `properties` blob, and how many relations do we allow?** We do not set separate limits for these. For now, the **4 MiB** gRPC message limit that we have today bounds the complete response from one plugin run. It is not a target, and we expect to raise it in the future; see [Proposed limits](#proposed-limits) and [Plugin response size on the wire](#plugin-response-size-on-the-wire). How big the `properties` are in practice is shown in [Plugin properties](#plugin-properties).
 
 ### Customer-scale context from Max
 
