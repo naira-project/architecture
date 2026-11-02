@@ -4,7 +4,7 @@ date: 2026-11-02
 written-by: Marcel Frizler
 ---
 
-# ADR-012: CI Owns Per-Run E2E vClusters
+# ADR-013: CI Owns Per-Run E2E vClusters
 
 ## Context
 
