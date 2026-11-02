@@ -77,6 +77,8 @@ CON
 
 ## Decision
 
+**Chosen option**: Option B, CI creates and deletes the vCluster with the `vcluster` CLI.
+
 Per-run e2e vClusters are created and deleted by CI with the `vcluster` CLI. They are not GitOps-managed. The `e2e` deployment environment approval is the gate. The vCluster lives for one job.
 
 This replaces ADR-011's per-PR e2e lifecycle class. The per-developer and dev/staging classes stay as ADR-011 defines them.
@@ -84,7 +86,7 @@ This replaces ADR-011's per-PR e2e lifecycle class. The per-developer and dev/st
 ### Workflow shape
 
 - Job **`authorize`**: no `environment`, no secrets, no `id-token`. Read-only `contents` and `pull-requests`.
-  - Unlabelled PRs skip without asking a reviewer (`run-e2e` label opt-in).
+  - PRs labelled `skip-e2e` skip without asking a reviewer. All other same-repo PRs request the run.
   - Validates the PR number as a positive integer before using it anywhere.
   - Checks through the GitHub API that the PR is open and its head repo is this repo.
   - A fork `pull_request` ends as skipped with a notice. A fork or closed-PR `workflow_dispatch` fails.
@@ -128,6 +130,14 @@ No sweeper is built.
 - The platform user `github-e2e` may write `management.loft.sh` resources in project `e2e` only. Its access key expires and is stored only as an `e2e` environment secret.
 - ADR-011's rule that only ArgoCD's service account writes these resources holds for every other project.
 
+### Tailnet identity
+
+With `environment: e2e`, GitHub's default OIDC `sub` claim is `repo:naira-project/naira:environment:e2e`. It names neither the workflow file nor the ref, so any workflow in the repo that declares `environment: e2e` would match.
+
+- The repo's OIDC subject template is customized to include `job_workflow_ref` after the default context claims.
+- The Tailscale federated identity trusts `repo:naira-project/naira:environment:e2e:job_workflow_ref:naira-project/naira/.github/workflows/e2e.yml@*`.
+- The ref stays a wildcard because PR runs use `refs/pull/<n>/merge`. The workflow path is pinned.
+
 ### Threats and controls
 
 | Threat | Control |
@@ -136,7 +146,8 @@ No sweeper is built.
 | Maintainer dispatches with a fork or closed PR number | `authorize` checks head repo and state for dispatches too |
 | Input injection through the PR number | Validated as a positive integer in `authorize`. Downstream uses only the validated output |
 | Same-repo PR runs unreviewed code with infra access | `e2e` environment requires reviewer approval, self-review prevented |
-| Stolen Tailscale credential | None exists. Federated identity trusts only `repo:naira-project/naira:environment:e2e` |
+| Stolen Tailscale credential | None exists. Federated identity trusts only the subject of the E2E workflow in environment `e2e` (see [Tailnet identity](#tailnet-identity)) |
+| Another workflow declares `environment: e2e` to join the tailnet | Subject pins `job_workflow_ref` to the E2E workflow file. Other workflow files get a non-matching subject |
 | Lateral movement on the tailnet | `tag:ci` reaches only `tag:vcluster-platform` on tcp/443, enforced by ACL tests. The EKS API is never reachable |
 | PR-controlled code reads the platform key | Key lives only in the provision and teardown steps' `env:`. Platform CLI config is deleted before PR-controlled steps run |
 | Build-time code steals credentials | Images are built before any tailnet or platform credential exists |
@@ -184,6 +195,7 @@ To be checked during implementation, against vCluster Platform 4.12 / vCluster 0
 - A cancelled run still deletes its vCluster.
 - "Re-run failed jobs" creates a vCluster with a new name.
 - No platform CLI config remains on the runner after the provision step.
+- The Tailscale federated identity accepts the pinned subject with a ref wildcard, and rejects a token from another workflow file in environment `e2e`.
 
 ## Related links
 
