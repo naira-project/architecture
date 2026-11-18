@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-02
 written-by: Marcel Frizler
 ---
