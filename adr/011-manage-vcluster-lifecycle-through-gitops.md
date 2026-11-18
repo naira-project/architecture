@@ -105,9 +105,11 @@ Git is the only writer for vCluster lifecycle. The platform UI is used for viewi
 
 | Class | Existence driven by | Mechanism | Prune |
 | --- | --- | --- | --- |
-| Per-PR e2e | Pull request state | `ApplicationSet`, PullRequest generator | on |
+| Per-PR e2e (superseded by [ADR-013](./013-ci-owned-per-run-e2e-vclusters.md)) | Pull request state | `ApplicationSet`, PullRequest generator | on |
 | Per-developer | Entry in a list file | `ApplicationSet`, List generator | on |
 | Dev/staging | Git, long-lived | plain `Application`, version-pinned | off |
+
+> **Note:** The per-PR e2e class is superseded by [ADR-013](./013-ci-owned-per-run-e2e-vclusters.md). E2E vClusters are created and deleted per run by CI, not by an `ApplicationSet`.
 
 **ApplicationSet & PullRequest generator**: An ArgoCD ApplicationSet with the PullRequest generator polls the GitHub API for open PRs (optionally only those with a given label) and renders one Application per PR from a template, with the PR number and head SHA as template variables.
 
