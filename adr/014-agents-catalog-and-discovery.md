@@ -1,5 +1,14 @@
 # Agent Catalog and Discovery/Ingest
 
+## Intro
+The issue with agents is that there is not just one tool where we can consume the API. 
+
+Agents run as part of platforms like n8n or loveable. Practically when you use your desktop app or CLI of opencode, claude etc. thats also an agent. And then there are agent frameworks like crewAI. 
+
+This means it isn’t simple to track them. In theory we could say, every software that calls an LLM is an agent. But thats not always true. E.g. Think about a webshop, where the support chat is managed by an AI agent. However, it is integrated in the shop and not in a microservice architecture an own service. 
+
+So we have to find signals for it. 
+
 ## Context
 
 How does the catalog represent an AI agent, and how does it relate the same agent when several sources report it? 
@@ -41,7 +50,7 @@ CON
 
 - The same agent appears once per source in lists and counts until the UI groups agents by shared anchor.
 - Agents with no shared anchor (a registry record without endpoint or card) stay unrelated.
-- Plugins must agree on anchor paths: URL normalization and the `deployment` path scheme.
+- Plugins must agree on anchor paths: URL normalization (see "Rules" section later in the document) and the `deployment` path scheme.
 
 ### Option B: `agent` kind with identity derived from the Agent Card URL
 
@@ -114,13 +123,14 @@ Both constants are added to `plugins/pkg/pluginapi/schema.go`.
 - No plugin and no core logic merges or relates agents by name.
 - Two `agent` nodes are treated as the same agent only when they share a `deployment` or an `agent_card` anchor. The catalog stores them as separate nodes. Grouping them is a presentation concern and gets a DDR.
 - Card URL normalization: HTTPS only, lowercase host, default port removed, query and fragment removed, no trailing slash. One shared helper in `plugins/internal/`.
-- Shared properties on `agent`, all optional except `name`: `name`, `provider`, `version`, `framework`, `endpoint`. Source-specific properties stay in the plugin's claim.
+  - For example Before: https://Agents.Example.com:443/.well-known/agent-card.json?v=2#top ; After: agents.example.com/.well-known/agent-card.json
+- Shared common properties on `agent`, all optional except `name`: `name`, `provider`, `version`, `framework`, `endpoint`. Source-specific properties stay in the plugin's claim.
 - A plugin that emits `described_by` does not need to fetch the card. Only the A2A plugin adds content claims to `agent_card`.
 
 ### Not decided here
 
-- Whether client tools observed at an AI gateway are `agent` nodes. Until decided they are not.
-- Keeping last known data when one target fails inside a successful run. This affects several plugins and needs its own decision.
+- Whether client tools (like lokal desktop AI tools) observed at an AI gateway are `agent` nodes. Until decided they are not.
+- Keeping last known data when one target (source sync) fails inside a successful run. This affects several plugins and needs its own decision.
 - Skills and agent-to-agent relations.
 
 ## Consequences
