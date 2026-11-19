@@ -2,7 +2,93 @@
 
 # Summary
 
-Teams ask what AI costs them, what the total cost of ownership is and what they get in return. Each of these answers sits in a different tool today. This RFC proposes how Naira brings spend and delivery evidence into the hub. 
+The question that often appears is not only How much does AI cost me?, but also What are the total cost of ownership? (TCO) and Which return do we get on our investment? (ROI)
+
+The first question is partially answered by tools like LiteLLM, agentgateway and cloud bills. Now, the TCO becomes more complicated as the separated costs views are not enough. We also would include self hosted models, maybe data traffic costs, hosted apps, and agents that use AI. At last the ROI has to match all this to what do you get in return. For now, we will look only at the layers we know: Code, infrastructure, deployments, etc.; hence, we exclude the business perspective.
+
+Based on those three questions, we can develop more perspectives or capabilities. My thoughts to it are that we need to see what do we get from the plugins: I guess we will need to find a harmonized/standards view so we can ensure that if tools are exchanged we can deliver same transparency. So that means we have to extend the graph model. 
+
+## Potential Capabilities to achieve
+### AI Spend Map
+**What is it good for**
+
+Shows an aggregated view of costs to drill down on applications, models, agents etc. Anything that’s reported to Naira. So instead of that one going, e.g., into the model catalog and seeing some cost information there, this view comes from the other direction. We see all costs, and break it down.
+
+**How this should work**
+
+We have to rely on spend information forwarded to us. Sources could be: LiteLLM, agentgateway, other gateways. 
+
+In addition, we can expect information from the cloud provider. Either we implement our own features for it (right now we might skip that), or we implement a Plugin for OpenCost, which we can then consume. (openCost is widely used, and recently announced to implement againts llm-d, which is a wrapper on vLLM+kserve).
+
+Finally, there are still possibilities to also get cost attributes from the public model provider themself (OpenAI, Anthropic, Mistral, idk…). We would require to all of them an integration.
+
+In future, commercial provider might be also a source. To be ignored for now.
+
+Future work: self hosted model costs.
+
+**What do we need**
+
+- cost history with break down per model, per user from gateways
+- OpenCost Plugin and itegration
+- Public model provider integration
+ - OpenAI
+ - Anthropic
+ - Mistral
+ - OpenRouter?
+
+### AI Governance Gaps
+**What is it good for**
+
+So I think of it like the “Anti-Spend Map”: Spend on keys with no owner, endpoints with no consumer, models in use that the tech radar marks Hold, AI systems with no known “end user”.
+
+**How this should work**
+
+Essentially, we use the info from the spend map, and everything that has no Owner, no user, or is linked to a Hold tech radar shows up.
+
+**What do we need**
+
+- get the spend map right
+- take the negative of the spend map grinning face with smiling eyes 
+
+### AI Delivery Funnel (incl. PR to workload lineage)
+Remark, this is a highly ask feature, but absolutely not simple to deliver.
+
+**What is it good for**
+
+The idea is to track down AI work through the entire value chain until it hits production or the trash bin. This work can be related to costs (of the model) but also other elements, e.g. number of reviews, how often a CI or test has to run. Thus, it can be compared to human work and against itself. So the end user should see an improvement over time. This gives a return on investment (ROI).
+
+**How this should work**
+
+That’s a complex one. The working line looks like:
+
+AI-marked PRs opened, reviewed (human or Copilot) & especially requests for changes, e.g., the more, the worse; additionally, Copilot or other review agent findings; then how often CI/tests fail or have to run. Maybe we could even match the actual request to the PR/development. 
+
+Then we have two interesting paths:
+
+a) PR merge to workload delivery: so after the merge what are the delivery stages until it hits production and what are the outcomes of each stage, which ldeas to:
+
+b) rework rate: how often this specific PR, feature, code segment needs to be reworked until it goes into production.
+
+**What do we need**
+
+TBD
+
+But have to decludder DORA | Artificial Intelligence  
+
+### Project/Product Cost Allocation
+**What is it good for**
+
+All the cost break downs and views are either from one single entity to many, from many to one entity, or along a production line (code, commit, pr, rewrite).
+
+Cluster projects/products and sum up their costs and usage therefore gives a specific view relevant to a team, product manager, head of X.
+
+**How this should work**
+
+People who are associated with a Project/Product can see their cost breakdown for exactly this. So in theory it's just a filter on the AI Spend Map.
+
+**What do we need**
+
+Implementation of the Project/Product logic. 
 
 # Motivation
 
@@ -58,6 +144,12 @@ Plugins put a JSON list of spend records in a documented format into the reserve
 
 - Pros: no change to the proto, the database schema or the existing API routes; one format for every source; required basis, currency and window make the adding rules enforceable; additive; follows the tech radar plugin, which already stores JSON lists in string properties.
 - Cons: weakly typed inside a string; aggregation happens in catalog code or the UI and not in SQL over typed columns; properties grow beyond the RFC-011 baseline; the first property with reserved meaning narrows "schema-less".
+ - a proposed solution to solve this could be: if we introduce manifest, we could also introduce a field name mapping there to avoid a reserved name - i.e. manifest would have something like (loose idea):
+  ```
+  - spend_props:
+    - {kind: "model", prop: "costsBreakdown"}
+    - {kind: "inference_endpoint", prop: "spend"}
+  ```
 - Effort: small. A validator in the catalog, a helper in the plugin SDK, documentation.
 - Reversibility: high. A plugin that stops emitting `spend` leaves no trace after its next run. The same fields map into Option C later.
 
@@ -158,13 +250,27 @@ Size: a record with 30 daily values is about 1 KB, within the range RFC-011 exam
 
 The UI needs totals and breakdowns over many nodes. Under Option B the catalog offers a read-only aggregation over the validated records, so the UI does not page through all nodes. Whether this is a new route or a parameter on the existing node routes is an open question. It adds no table and no write path.
 
+## Potential data to store
+
+- token spend input/output
+- total spend per person/model/api key
+- execution times of CI/CD pipelines
+- cost of CI/CD 
+- cost per resource (e.g. in cloud, server, managed service like DB, registry, storage volume)
+- number of reviews
+- number of failed deployments in test/pre-prod/prod
+- failed component post deployment (e.g. with the 7 days after deployment)
+- most currency is in $, we should also do €
+- time period, at least 7 days, 1-3 month would be more helpful for departments
+ - or an aggregated sum over time
+
 ## When to move to Option C
 
 Option B is the start, not the end state:
 
 - Adopters need spend history beyond the window inside Naira, and an external store (Option D) is not acceptable to them.
 - Aggregation over properties exceeds an agreed response time at the sizes of RFC-011.
-- Spend records regularly exceed the per-message limit.
+- Spend records regularly exceed the per-message limit. (Could be adjusted if needed)
 - More than one consumer besides the Naira UI needs to query spend.
 
 The record fields are chosen so that the move is a mapping and not a redesign.
